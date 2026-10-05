@@ -82,9 +82,8 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   return (
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-60 flex-col bg-slate-900 md:flex">
-      <Link href="/dashboard" className="flex h-14 items-center gap-2 border-b border-slate-800 px-4">
-        <span className="flex h-7 w-7 items-center justify-center rounded bg-blue-600"><Cpu className="h-4 w-4 text-white" /></span>
-        <span className="text-sm font-semibold tracking-wide text-white">ELECTAVA Inventory</span>
+      <Link href="/dashboard" className="flex h-16 items-center justify-center border-b border-slate-800 bg-black">
+        <img src="/logo-dark.png" alt="ELECTAVA INVENTORY" className="h-10 object-contain" />
       </Link>
       <SidebarNav />
       <div className="border-t border-slate-800 p-3">

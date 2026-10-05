@@ -1,4 +1,6 @@
-"use client";
+import os
+
+LOGIN_PAGE = """\"use client\";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
@@ -52,7 +54,7 @@ function LoginInner() {
           <Field label={<span className="text-zinc-300">Email</span>} htmlFor="email" error={errors.email?.message}>
             <Input id="email" type="email" autoComplete="username" autoFocus invalid={!!errors.email}
               className="bg-zinc-900 border-zinc-800 text-white focus:border-[#5BFF2E] focus:ring-[#5BFF2E]/20"
-              {...register("email", { required: "Enter your email.", pattern: { value: /^\S+@\S+\.\S+$/, message: "Enter a valid email address." } })} />
+              {...register("email", { required: "Enter your email.", pattern: { value: /^\\S+@\\S+\\.\\S+$/, message: "Enter a valid email address." } })} />
           </Field>
           <Field label={<span className="text-zinc-300">Password</span>} htmlFor="password" error={errors.password?.message}>
             <Input id="password" type="password" autoComplete="current-password" invalid={!!errors.password}
@@ -74,3 +76,37 @@ export default function LoginPage() {
     </Suspense>
   );
 }
+"""
+
+with open('frontend/src/app/login/page.tsx', 'w', encoding='utf-8') as f:
+    f.write(LOGIN_PAGE)
+
+import re
+
+with open('frontend/src/components/layout/sidebar.tsx', 'r', encoding='utf-8') as f:
+    s = f.read()
+
+# Replace the sidebar header
+old_sidebar_header = r'<Link href="/dashboard" className="flex h-14 items-center gap-2 border-b border-slate-800 px-4">.*?</Link>'
+new_sidebar_header = '''<Link href="/dashboard" className="flex h-16 items-center justify-center border-b border-slate-800 bg-black">
+        <img src="/logo-dark.png" alt="ELECTAVA INVENTORY" className="h-10 object-contain" />
+      </Link>'''
+
+s = re.sub(old_sidebar_header, new_sidebar_header, s, flags=re.DOTALL)
+
+with open('frontend/src/components/layout/sidebar.tsx', 'w', encoding='utf-8') as f:
+    f.write(s)
+
+with open('frontend/src/components/layout/mobile-nav.tsx', 'r', encoding='utf-8') as f:
+    m = f.read()
+
+old_mobile_header = r'<div className="flex h-14 shrink-0 items-center gap-2 border-b border-slate-200 px-4">.*?</div>'
+new_mobile_header = '''<div className="flex h-16 shrink-0 items-center justify-center border-b border-slate-200 bg-black px-4">
+          <img src="/logo-dark.png" alt="ELECTAVA INVENTORY" className="h-10 object-contain" />
+        </div>'''
+m = re.sub(old_mobile_header, new_mobile_header, m, flags=re.DOTALL)
+
+with open('frontend/src/components/layout/mobile-nav.tsx', 'w', encoding='utf-8') as f:
+    f.write(m)
+
+print("Updated UI themes and injected the logo.")
