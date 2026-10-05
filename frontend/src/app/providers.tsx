@@ -6,6 +6,7 @@ import { useState } from "react";
 import { ToastProvider } from "@/components/ui/toast";
 import { ApiError } from "@/lib/api";
 import { AuthProvider } from "@/lib/auth";
+import { ThemeProvider } from "next-themes";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [client] = useState(
@@ -23,7 +24,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={client}>
       <ToastProvider>
-        <AuthProvider>{children}</AuthProvider>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <AuthProvider>{children}</AuthProvider>
+      </ThemeProvider>
       </ToastProvider>
     </QueryClientProvider>
   );

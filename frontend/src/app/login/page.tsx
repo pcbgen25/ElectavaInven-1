@@ -16,7 +16,6 @@ interface LoginForm {
 }
 
 function safeNext(next: string | null): string {
-  // Only allow same-site relative paths (prevents open redirects).
   return next && next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
 }
 
@@ -38,30 +37,31 @@ function LoginInner() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-black px-4">
+    <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4 transition-colors dark:bg-black">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex justify-center">
-          <img src="/logo-dark.png" alt="ELECTAVA INVENTORY" className="h-16 md:h-20 object-contain" />
+          <img src="/logo-light.png" alt="ELECTAVA INVENTORY" className="h-16 md:h-20 object-contain dark:hidden" />
+          <img src="/logo-dark.png" alt="ELECTAVA INVENTORY" className="hidden h-16 md:h-20 object-contain dark:block" />
         </div>
-        <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4 rounded-xl border border-zinc-800 bg-zinc-950 p-6 shadow-2xl">
+        <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4 rounded-xl border border-slate-200 bg-white p-6 shadow-xl dark:border-zinc-800 dark:bg-zinc-950 dark:shadow-2xl">
           <div>
-            <h1 className="text-base font-semibold text-white">Sign in</h1>
-            <p className="text-sm text-zinc-400">Use your company account.</p>
+            <h1 className="text-base font-semibold text-slate-900 dark:text-white">Sign in</h1>
+            <p className="text-sm text-slate-500 dark:text-zinc-400">Use your company account.</p>
           </div>
           {error && <ErrorState message={error} />}
-          <Field label={<span className="text-zinc-300">Email</span>} htmlFor="email" error={errors.email?.message}>
+          <Field label={<span className="text-slate-700 dark:text-zinc-300">Email</span>} htmlFor="email" error={errors.email?.message}>
             <Input id="email" type="email" autoComplete="username" autoFocus invalid={!!errors.email}
-              className="bg-zinc-900 border-zinc-800 text-white focus:border-[#5BFF2E] focus:ring-[#5BFF2E]/20"
+              className="bg-white text-slate-900 border-slate-300 focus:border-[#5BFF2E] dark:bg-zinc-900 dark:border-zinc-800 dark:text-white dark:focus:ring-[#5BFF2E]/20"
               {...register("email", { required: "Enter your email.", pattern: { value: /^\S+@\S+\.\S+$/, message: "Enter a valid email address." } })} />
           </Field>
-          <Field label={<span className="text-zinc-300">Password</span>} htmlFor="password" error={errors.password?.message}>
+          <Field label={<span className="text-slate-700 dark:text-zinc-300">Password</span>} htmlFor="password" error={errors.password?.message}>
             <Input id="password" type="password" autoComplete="current-password" invalid={!!errors.password}
-              className="bg-zinc-900 border-zinc-800 text-white focus:border-[#5BFF2E] focus:ring-[#5BFF2E]/20"
+              className="bg-white text-slate-900 border-slate-300 focus:border-[#5BFF2E] dark:bg-zinc-900 dark:border-zinc-800 dark:text-white dark:focus:ring-[#5BFF2E]/20"
               {...register("password", { required: "Enter your password." })} />
           </Field>
           <Button type="submit" className="w-full bg-[#5BFF2E] font-semibold text-black hover:bg-[#4be622]" loading={isSubmitting}>Sign in</Button>
         </form>
-        <p className="mt-6 text-center text-xs text-zinc-600">Internal system. Access is logged.</p>
+        <p className="mt-6 text-center text-xs text-slate-500 dark:text-zinc-600">Internal system. Access is logged.</p>
       </div>
     </div>
   );
