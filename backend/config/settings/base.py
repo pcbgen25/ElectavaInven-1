@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     "apps.manufacturers",
     "apps.projects",
     "apps.bom",
+    "apps.inventory",
     "apps.components",
     "apps.reports",
 ]
