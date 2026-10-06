@@ -22,6 +22,8 @@ def _resolve_required(view, request):
     mapping = getattr(view, "required_permissions", None)
     if mapping is None:
         return None
+    if isinstance(mapping, (str, list)):
+        return mapping
     action = getattr(view, "action", None) or request.method.lower()
     if action in mapping:
         return mapping[action]

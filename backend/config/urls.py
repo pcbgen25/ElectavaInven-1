@@ -10,6 +10,8 @@ api_patterns = [
     path("", include("apps.accounts.urls")),
     path("", include("apps.audit.urls")),
     path("", include("apps.manufacturers.urls")),
+    path("", include("apps.projects.urls")),
+    path("", include("apps.bom.urls")),
     path("", include("apps.components.urls")),
     path("", include("apps.reports.urls")),
     path("schema", SpectacularAPIView.as_view(), name="schema"),
