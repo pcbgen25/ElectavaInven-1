@@ -30,7 +30,7 @@ export default function ManufacturersPage() {
   const [editing, setEditing] = useState<Manufacturer | null | undefined>(undefined);
   const del = useDeleter(INVALIDATE);
 
-  const { data, isFetching, error, refetch } = useQuery({
+  const { data, isFetching, error, refetch } = useQuery<any>({
     queryKey: ["manufacturers", list.query],
     queryFn: () => api<Paginated<Manufacturer>>("manufacturers", { query: list.query }),
     placeholderData: keepPreviousData,

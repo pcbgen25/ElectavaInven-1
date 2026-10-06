@@ -49,7 +49,7 @@ export default function ComponentsPage() {
   const { data: manufacturers } = useManufacturerOptions();
   const { data: packages } = usePackageOptions();
 
-  const { data, isFetching, error, refetch } = useQuery({
+  const { data, isFetching, error, refetch } = useQuery<any>({
     queryKey: ["components", list.query],
     queryFn: () => api<Paginated<ComponentListItem>>("components", { query: list.query }),
     placeholderData: keepPreviousData,

@@ -26,7 +26,7 @@ export default function AuditLogPage() {
   const allowed = can("audit.view");
   const list = useListState({ ordering: "-timestamp" });
   const [open, setOpen] = useState<AuditEntry | null>(null);
-  const { data, isFetching, error, refetch } = useQuery({
+  const { data, isFetching, error, refetch } = useQuery<any>({
     queryKey: ["audit-logs", list.query],
     queryFn: () => api<Paginated<AuditEntry>>("audit-logs", { query: list.query }),
     placeholderData: keepPreviousData,

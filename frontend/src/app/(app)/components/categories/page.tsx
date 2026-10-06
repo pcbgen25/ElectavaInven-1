@@ -50,7 +50,7 @@ export default function CategoriesPage() {
   const tree = useMemo(() => categoryTreeOptions(categories), [categories]);
   const selected = categories?.find((c) => c.id === selectedId) ?? null;
 
-  const defs = useQuery({
+  const defs = useQuery<any>({
     queryKey: ["categories", selectedId, "spec-defs", true],
     queryFn: () => api<SpecDefinition[]>(`categories/${selectedId}/specification-definitions`, { query: { include_inactive: true } }),
     enabled: !!selectedId,

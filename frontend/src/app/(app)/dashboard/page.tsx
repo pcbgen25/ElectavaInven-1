@@ -45,7 +45,7 @@ const ACTION_VERB: Record<string, string> = { CREATE: "created", UPDATE: "update
 
 export default function DashboardPage() {
   const { user, can } = useAuth();
-  const { data, isLoading, error, refetch } = useQuery({ queryKey: ["dashboard"], queryFn: () => api<DashboardData>("dashboard") });
+  const { data, isLoading, error, refetch } = useQuery<any>({ queryKey: ["dashboard"], queryFn: () => api<DashboardData>("dashboard") });
 
   return (
     <>

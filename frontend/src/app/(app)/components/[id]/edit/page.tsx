@@ -13,7 +13,7 @@ import type { ComponentDetail } from "@/lib/types";
 export default function EditComponentPage() {
   const { id } = useParams<{ id: string }>();
   const { can } = useAuth();
-  const { data, isLoading, error, refetch } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery<any>({
     queryKey: ["component", id],
     queryFn: () => api<ComponentDetail>(`components/${id}`),
   });

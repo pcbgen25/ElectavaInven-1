@@ -85,7 +85,7 @@ function FileSlot({ component, field, canEdit }: { component: ComponentDetail; f
 }
 
 function Activity({ id }: { id: number }) {
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error } = useQuery<any>({
     queryKey: ["audit", "component", String(id)],
     queryFn: () => api<Paginated<AuditEntry>>("audit-logs", { query: { entity_type: "components.component", entity_id: String(id), ordering: "-timestamp", page_size: 20 } }),
   });
@@ -119,7 +119,7 @@ export default function ComponentDetailPage() {
   const { can } = useAuth();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const { data: c, isLoading, error, refetch } = useQuery({
+  const { data: c, isLoading, error, refetch } = useQuery<any>({
     queryKey: ["component", id],
     queryFn: () => api<ComponentDetail>(`components/${id}`),
   });

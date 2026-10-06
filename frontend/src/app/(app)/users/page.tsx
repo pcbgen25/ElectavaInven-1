@@ -22,7 +22,7 @@ const PROFILE_FIELDS = [
 ] as const;
 
 function useRoles() {
-  return useQuery({ queryKey: ["roles"], queryFn: async () => (await api<Paginated<Role>>("roles", { query: { page_size: 200, ordering: "name" } })).results });
+  return useQuery<any>({ queryKey: ["roles"], queryFn: async () => (await api<Paginated<Role>>("roles", { query: { page_size: 200, ordering: "name" } })).results });
 }
 
 function UserModal({ user, open, onClose }: { user: User | null; open: boolean; onClose: () => void }) {
@@ -139,7 +139,7 @@ export default function UsersPage() {
   const { data: roles } = useRoles();
 
   const allowed = can("user.manage");
-  const { data, isFetching, error, refetch } = useQuery({
+  const { data, isFetching, error, refetch } = useQuery<any>({
     queryKey: ["users", list.query],
     queryFn: () => api<Paginated<User>>("users", { query: list.query }),
     placeholderData: keepPreviousData,

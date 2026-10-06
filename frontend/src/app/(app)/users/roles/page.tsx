@@ -23,8 +23,8 @@ export default function RolesPage() {
   const [draft, setDraft] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
 
-  const roles = useQuery({ queryKey: ["roles"], queryFn: async () => (await api<Paginated<Role>>("roles", { query: { page_size: 200, ordering: "name" } })).results, enabled: allowed });
-  const perms = useQuery({ queryKey: ["permissions"], queryFn: () => api<Permission[]>("permissions"), enabled: allowed });
+  const roles = useQuery<any>({ queryKey: ["roles"], queryFn: async () => (await api<Paginated<Role>>("roles", { query: { page_size: 200, ordering: "name" } })).results, enabled: allowed });
+  const perms = useQuery<any>({ queryKey: ["permissions"], queryFn: () => api<Permission[]>("permissions"), enabled: allowed });
 
   const role = roles.data?.find((r) => r.id === selected) ?? roles.data?.[0];
   useEffect(() => {

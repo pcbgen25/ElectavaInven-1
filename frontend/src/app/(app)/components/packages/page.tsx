@@ -30,7 +30,7 @@ export default function PackagesPage() {
   const [editing, setEditing] = useState<Package | null | undefined>(undefined);
   const del = useDeleter(INVALIDATE);
 
-  const { data, isFetching, error, refetch } = useQuery({
+  const { data, isFetching, error, refetch } = useQuery<any>({
     queryKey: ["packages", list.query],
     queryFn: () => api<Paginated<Package>>("packages", { query: list.query }),
     placeholderData: keepPreviousData,

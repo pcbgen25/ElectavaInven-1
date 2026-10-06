@@ -49,12 +49,12 @@ function LoginInner() {
             <p className="text-sm text-slate-500 dark:text-zinc-400">Use your company account.</p>
           </div>
           {error && <ErrorState message={error} />}
-          <Field label={<span className="text-slate-700 dark:text-zinc-300">Email</span>} htmlFor="email" error={errors.email?.message}>
+          <Field label="Email" htmlFor="email" error={errors.email?.message}>
             <Input id="email" type="email" autoComplete="username" autoFocus invalid={!!errors.email}
               className="bg-white text-slate-900 border-slate-300 focus:border-[#5BFF2E] dark:bg-zinc-900 dark:border-zinc-800 dark:text-white dark:focus:ring-[#5BFF2E]/20"
               {...register("email", { required: "Enter your email.", pattern: { value: /^\S+@\S+\.\S+$/, message: "Enter a valid email address." } })} />
           </Field>
-          <Field label={<span className="text-slate-700 dark:text-zinc-300">Password</span>} htmlFor="password" error={errors.password?.message}>
+          <Field label="Password" htmlFor="password" error={errors.password?.message}>
             <Input id="password" type="password" autoComplete="current-password" invalid={!!errors.password}
               className="bg-white text-slate-900 border-slate-300 focus:border-[#5BFF2E] dark:bg-zinc-900 dark:border-zinc-800 dark:text-white dark:focus:ring-[#5BFF2E]/20"
               {...register("password", { required: "Enter your password." })} />

@@ -19,7 +19,7 @@ export default function SearchPage() {
     return () => clearTimeout(t);
   }, [text]);
 
-  const { data, isFetching, error } = useQuery({
+  const { data, isFetching, error } = useQuery<any>({
     queryKey: ["components", "quick-search", q],
     queryFn: () => api<Paginated<ComponentListItem>>("components", { query: { search: q, page_size: 30 } }),
     enabled: q.length >= 2,
