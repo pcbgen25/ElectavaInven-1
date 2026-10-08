@@ -1,110 +1,177 @@
-from rest_framework import viewsets, status
+"""BOM REST API. Released revisions are immutable; enforcement lives in serializers, services and models."""
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db.models import Count
+from django.shortcuts import get_object_or_404
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
-from django.utils import timezone
-from apps.core.permissions import HasRBACPermission
-from .models import BOM, BOMRevision, BOMItem
-from .serializers import BOMSerializer, BOMRevisionSerializer, BOMItemSerializer
 
-class BOMViewSet(viewsets.ModelViewSet):
-    @action(detail=False, methods=['post'], required_permissions='bom.import')
-    def import_kicad(self, request):
-        from .services import parse_kicad_csv, preview_bom_import, create_bom_from_import
-        from apps.projects.models import Project
-        
-        file_obj = request.FILES.get('file')
-        if not file_obj:
-            return Response({'error': 'No file uploaded'}, status=status.HTTP_400_BAD_REQUEST)
-            
-        file_content = file_obj.read().decode('utf-8')
-        raw_items = parse_kicad_csv(file_content)
-        preview = preview_bom_import(raw_items)
-        
-        return Response({'preview': preview})
+from apps.audit.mixins import AuditedModelViewSetMixin
+from apps.inventory.services import bom_inventory_availability
 
-    @action(detail=False, methods=['post'], required_permissions='bom.import')
-    def confirm_import(self, request):
-        from .services import create_bom_from_import
-        from apps.projects.models import Project
-        
-        project_id = request.data.get('project_id')
-        name = request.data.get('name')
-        matched_items = request.data.get('matched_items', [])
-        
-        project = Project.objects.get(pk=project_id)
-        bom = create_bom_from_import(project, name, request.user, matched_items)
-        
-        return Response(BOMSerializer(bom).data, status=status.HTTP_201_CREATED)
+from . import services
+from .models import BOM, BOMItem, BOMRevision
+from .serializers import (
+    BOMImportConfirmSerializer,
+    BOMImportPreviewSerializer,
+    BOMItemSerializer,
+    BOMRevisionListSerializer,
+    BOMRevisionSerializer,
+    BOMSerializer,
+)
 
-    queryset = BOM.objects.all().prefetch_related("revisions")
+
+class BOMViewSet(AuditedModelViewSetMixin, viewsets.ModelViewSet):
+    """DELETE soft-deletes the BOM; revisions (including released ones) are preserved."""
+
     serializer_class = BOMSerializer
-    permission_classes = [HasRBACPermission]
+    filterset_fields = ["project", "status"]
+    search_fields = ["name", "description", "project__code", "project__name"]
+    ordering_fields = ["name", "status", "created_at", "updated_at", "project__code"]
+    ordering = ["-created_at"]
     required_permissions = {
         "list": "bom.view",
         "retrieve": "bom.view",
         "create": "bom.create",
         "update": "bom.edit",
         "partial_update": "bom.edit",
-        "destroy": "bom.delete"
+        "destroy": "bom.delete",
+        "import_preview": "bom.import",
+        "import_confirm": "bom.import",
     }
 
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+    def get_queryset(self):
+        return BOM.objects.select_related("project", "created_by").prefetch_related("revisions")
 
-class BOMRevisionViewSet(viewsets.ModelViewSet):
-    @action(detail=False, methods=['get'], required_permissions='bom.compare')
-    def compare(self, request):
-        from .services import compare_revisions
-        rev_a_id = request.query_params.get('rev_a')
-        rev_b_id = request.query_params.get('rev_b')
-        
-        if not rev_a_id or not rev_b_id:
-            return Response({'error': 'rev_a and rev_b required'}, status=400)
-            
-        rev_a = BOMRevision.objects.get(pk=rev_a_id)
-        rev_b = BOMRevision.objects.get(pk=rev_b_id)
-        diffs = compare_revisions(rev_a, rev_b)
-        
-        return Response({'diff': diffs})
+    @extend_schema(request={"multipart/form-data": BOMImportPreviewSerializer}, responses={200: dict})
+    @action(detail=False, methods=["post"], url_path="import/preview", parser_classes=[MultiPartParser])
+    def import_preview(self, request):
+        """Step 1-3 of the KiCad wizard: detect columns, apply mapping, match components."""
+        ser = BOMImportPreviewSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        content = services.decode_upload(ser.validated_data["file"].read())
+        columns, detected, sample = services.detect_columns(content)
+        mapping = ser.validated_data.get("mapping") or None
+        items = services.parse_kicad_csv(content, mapping)
+        preview = services.preview_bom_import(items)
+        summary = {s: sum(1 for p in preview if p["match_status"] == s)
+                   for s in (services.MatchStatus.MATCHED, services.MatchStatus.UNMATCHED, services.MatchStatus.AMBIGUOUS)}
+        return Response({
+            "columns": columns,
+            "detected_mapping": detected,
+            "mapping": {**detected, **(mapping or {})},
+            "sample_rows": sample,
+            "items": preview,
+            "summary": {**summary, "total": len(preview)},
+        })
 
-    queryset = BOMRevision.objects.all().prefetch_related("items__component")
+    @extend_schema(request=BOMImportConfirmSerializer, responses={201: BOMSerializer})
+    @action(detail=False, methods=["post"], url_path="import/confirm")
+    def import_confirm(self, request):
+        """Step 5: create the BOM and REV A from resolved rows."""
+        ser = BOMImportConfirmSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        d = ser.validated_data
+        bom = services.create_bom_from_import(d["project"], d["name"], request.user, d["items"], d["description"], request)
+        return Response(BOMSerializer(self.get_queryset().get(pk=bom.pk)).data, status=status.HTTP_201_CREATED)
+
+
+class BOMRevisionViewSet(AuditedModelViewSetMixin, viewsets.ModelViewSet):
     serializer_class = BOMRevisionSerializer
-    permission_classes = [HasRBACPermission]
+    filterset_fields = ["bom", "status"]
+    search_fields = ["revision_number", "revision_name", "bom__name"]
+    ordering_fields = ["created_at", "revision_number", "released_at"]
+    ordering = ["-created_at"]
     required_permissions = {
         "list": "bom.view",
         "retrieve": "bom.view",
+        "compare": "bom.view",
+        "availability": "bom.view",
+        "cost": "bom.view",
         "create": "bom.create",
         "update": "bom.edit",
         "partial_update": "bom.edit",
-        "destroy": "bom.delete"
+        "destroy": "bom.edit",
+        "release": "bom.release",
     }
 
-    def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+    def get_queryset(self):
+        qs = BOMRevision.objects.select_related("bom__project", "created_by", "released_by")
+        if self.action == "list":
+            return qs.annotate(item_count=Count("items"))
+        return qs.prefetch_related("items__component")
 
-    @action(detail=True, methods=["post"], required_permissions="bom.release")
+    def get_serializer_class(self):
+        return BOMRevisionListSerializer if self.action == "list" else BOMRevisionSerializer
+
+    def check_can_delete(self, instance):
+        try:
+            services.ensure_revision_editable(instance)
+        except DjangoValidationError as exc:
+            raise ValidationError({"detail": exc.messages}) from None
+
+    @extend_schema(request=None, responses=BOMRevisionSerializer)
+    @action(detail=True, methods=["post"])
     def release(self, request, pk=None):
-        revision = self.get_object()
-        if revision.status == BOMRevision.Status.RELEASED:
-            return Response({"detail": "Already released"}, status=status.HTTP_400_BAD_REQUEST)
-        
-        revision.status = BOMRevision.Status.RELEASED
-        revision.released_by = request.user
-        revision.released_at = timezone.now()
-        
-        # Snap cost calculations here or assume already snapped
-        revision.save()
-        return Response(self.get_serializer(revision).data)
+        revision = services.release_revision(self.get_object(), request.user, request)
+        return Response(BOMRevisionSerializer(self.get_queryset().get(pk=revision.pk)).data)
 
-class BOMItemViewSet(viewsets.ModelViewSet):
-    queryset = BOMItem.objects.all().select_related("component")
+    @extend_schema(parameters=[OpenApiParameter("rev_a", int, required=True), OpenApiParameter("rev_b", int, required=True)],
+                   responses={200: dict})
+    @action(detail=False, methods=["get"])
+    def compare(self, request):
+        ids = {k: request.query_params.get(k, "") for k in ("rev_a", "rev_b")}
+        bad = [k for k, v in ids.items() if not v.isdigit()]
+        if bad:
+            raise ValidationError({k: "A revision id is required." for k in bad})
+        rev_a = get_object_or_404(BOMRevision, pk=ids["rev_a"])
+        rev_b = get_object_or_404(BOMRevision, pk=ids["rev_b"])
+        return Response({
+            "rev_a": BOMRevisionListSerializer(rev_a).data,
+            "rev_b": BOMRevisionListSerializer(rev_b).data,
+            "diff": services.compare_revisions(rev_a, rev_b),
+        })
+
+    @extend_schema(parameters=[OpenApiParameter("build_quantity", str)], responses={200: dict})
+    @action(detail=True, methods=["get"])
+    def availability(self, request, pk=None):
+        """Required / on hand / reserved / available / shortage per component (lines aggregated)."""
+        return Response(bom_inventory_availability(self.get_object(), request.query_params.get("build_quantity", "1")))
+
+    @extend_schema(responses={200: dict})
+    @action(detail=True, methods=["get"])
+    def cost(self, request, pk=None):
+        return Response(services.calculate_bom_cost(self.get_object()))
+
+
+class BOMItemViewSet(AuditedModelViewSetMixin, viewsets.ModelViewSet):
     serializer_class = BOMItemSerializer
-    permission_classes = [HasRBACPermission]
+    filterset_fields = ["revision", "component"]
+    ordering = ["id"]
     required_permissions = {
         "list": "bom.view",
         "retrieve": "bom.view",
         "create": "bom.edit",
         "update": "bom.edit",
         "partial_update": "bom.edit",
-        "DELETE": "bom.edit"
+        "destroy": "bom.edit",
     }
+
+    def get_queryset(self):
+        return BOMItem.objects.select_related("component", "revision")
+
+    def _ensure_editable(self, item):
+        try:
+            services.ensure_revision_editable(item.revision)
+        except DjangoValidationError as exc:
+            raise ValidationError({"detail": exc.messages}) from None
+
+    def perform_update(self, serializer):
+        self._ensure_editable(serializer.instance)
+        super().perform_update(serializer)
+
+    def check_can_delete(self, instance):
+        self._ensure_editable(instance)

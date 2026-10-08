@@ -38,7 +38,7 @@ export default function SearchPage() {
         : !data?.results.length ? <EmptyState title="No components found" description={`Nothing matches “${q}”.`} />
         : (
           <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200 bg-white">
-            {data.results.map((c) => (
+            {data.results.map((c: any) => (
               <li key={c.id}>
                 <Link href={`/components/${c.id}`} className="block px-3 py-2.5 hover:bg-slate-50">
                   <div className="flex items-center justify-between gap-2"><span className="pn font-medium text-blue-700">{c.internal_part_number}</span><LifecycleBadge value={c.lifecycle_status} /></div>

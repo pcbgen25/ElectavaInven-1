@@ -1,16 +1,21 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import (WarehouseViewSet, WarehouseLocationViewSet, InventoryItemViewSet, 
-                    StockTransactionViewSet, StockReservationViewSet, StockOperationViewSet)
+from apps.core.routers import OptionalSlashRouter
 
-router = DefaultRouter()
-router.register(r'warehouses', WarehouseViewSet, basename='warehouse')
-router.register(r'locations', WarehouseLocationViewSet, basename='location')
-router.register(r'stock', InventoryItemViewSet, basename='stock')
-router.register(r'transactions', StockTransactionViewSet, basename='transaction')
-router.register(r'reservations', StockReservationViewSet, basename='reservation')
-router.register(r'operations', StockOperationViewSet, basename='operation')
+from .views import (
+    InventoryItemViewSet,
+    StockOperationViewSet,
+    StockReservationViewSet,
+    StockTransactionViewSet,
+    WarehouseLocationViewSet,
+    WarehouseViewSet,
+)
 
-urlpatterns = [
-    path('', include(router.urls)),
-]
+# Mounted at /api/inventory/. Same router as Phase 1: trailing slash optional.
+router = OptionalSlashRouter()
+router.register("warehouses", WarehouseViewSet, basename="warehouse")
+router.register("locations", WarehouseLocationViewSet, basename="location")
+router.register("stock", InventoryItemViewSet, basename="stock")
+router.register("transactions", StockTransactionViewSet, basename="transaction")
+router.register("reservations", StockReservationViewSet, basename="reservation")
+router.register("operations", StockOperationViewSet, basename="operation")
+
+urlpatterns = router.urls

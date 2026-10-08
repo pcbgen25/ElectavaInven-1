@@ -15,7 +15,7 @@ export default function BomDetail() {
   
   const { data: bom, isLoading, error } = useQuery<BOM>({
     queryKey: ["boms", bomId],
-    queryFn: () => api(`/api/boms/${bomId}/`),
+    queryFn: () => api(`/boms/${bomId}/`),
   });
 
   if (isLoading) return <div className="mt-10 flex justify-center"><Spinner /></div>;

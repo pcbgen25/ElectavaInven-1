@@ -20,10 +20,10 @@ export default function KiCadImportWizard() {
     mutationFn: async (f: File) => {
       const formData = new FormData();
       formData.append("file", f);
-      const res = await api(`/api/boms/import_kicad/`, { method: "POST", body: formData });
+      const res = await api(`/boms/import_kicad/`, { method: "POST", body: formData });
       return res;
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       setPreview(data.preview);
       setStep(3);
     },
@@ -37,14 +37,14 @@ export default function KiCadImportWizard() {
       // But the route is /bom/[id]/import!
       // If we are adding a revision to an EXISTING BOM, we should modify the backend or pass bom_id instead of project_id.
       // For this wizard, let's just alert the user it's a mock confirmation or call confirm_import.
-      const res = await api(`/api/boms/confirm_import/`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({
+      const res = await api(`/boms/confirm_import/`, { method: "POST", body: JSON.stringify({
         project_id: 1, // Hack for UI demo
         name: "Imported BOM",
         matched_items: preview
       }) });
       return res;
     },
-    onSuccess: (data) => {
+    onSuccess: (data: any) => {
       toast.success("BOM Imported!");
       router.push(`/bom/${data.id}`);
     }

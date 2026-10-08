@@ -17,18 +17,22 @@ PERMISSIONS: list[tuple[str, str, str]] = [
     ("project.create", "Create projects", "projects"),
     ("project.edit", "Edit projects", "projects"),
     ("project.delete", "Delete projects", "projects"),
+    ("project.manage_members", "Add and remove project members", "projects"),
     ("bom.view", "View BOMs", "bom"),
     ("bom.create", "Create BOMs", "bom"),
     ("bom.edit", "Edit BOMs", "bom"),
+    ("bom.delete", "Delete BOMs", "bom"),
     ("bom.import", "Import BOMs", "bom"),
     ("bom.release", "Release BOM revisions", "bom"),
     ("inventory.view", "View inventory", "inventory"),
+    ("inventory.manage", "Configure stock levels (minimum / reorder)", "inventory"),
     ("inventory.receive", "Receive stock", "inventory"),
     ("inventory.issue", "Issue stock", "inventory"),
     ("inventory.transfer", "Transfer stock", "inventory"),
     ("inventory.adjust", "Adjust stock", "inventory"),
-    ("inventory.reserve", "Reserve stock", "inventory"),
-    ("inventory.manage_locations", "Manage warehouses and locations", "inventory"),
+    ("inventory.reserve", "Reserve and release stock", "inventory"),
+    ("inventory.transaction_view", "View the stock transaction ledger", "inventory"),
+    ("inventory.warehouse_manage", "Manage warehouses and locations", "inventory"),
     ("supplier.view", "View suppliers", "suppliers"),
     ("supplier.create", "Create suppliers", "suppliers"),
     ("supplier.edit", "Edit suppliers and pricing", "suppliers"),
@@ -70,9 +74,10 @@ ROLES: dict[str, dict] = {
         "permissions": _VIEW_ALL
         + [
             "component.create", "component.edit", "masterdata.manage",
-            "project.create", "project.edit",
+            "project.create", "project.edit", "project.manage_members",
             "bom.create", "bom.edit", "bom.import", "bom.release",
-            "inventory.reserve", "purchase.create", "document.upload", "report.export",
+            "inventory.reserve", "inventory.transaction_view",
+            "purchase.create", "document.upload", "report.export",
         ],
     },
     "PCB_ENGINEER": {
@@ -92,6 +97,7 @@ ROLES: dict[str, dict] = {
         + [
             "supplier.create", "supplier.edit",
             "purchase.create", "purchase.order",
+            "inventory.transaction_view",
             "document.upload", "report.export",
         ],
     },
@@ -101,7 +107,8 @@ ROLES: dict[str, dict] = {
         "permissions": _VIEW_ALL
         + [
             "inventory.receive", "inventory.issue", "inventory.transfer", "inventory.adjust",
-            "inventory.reserve", "inventory.manage_locations", "purchase.receive", "report.export",
+            "inventory.reserve", "inventory.manage", "inventory.transaction_view",
+            "inventory.warehouse_manage", "purchase.receive", "report.export",
         ],
     },
     "PRODUCTION": {
@@ -109,7 +116,7 @@ ROLES: dict[str, dict] = {
         "description": "Consumes stock against projects and BOMs.",
         "permissions": [
             "component.view", "project.view", "bom.view", "inventory.view",
-            "inventory.issue", "document.view", "report.view",
+            "inventory.issue", "inventory.transaction_view", "document.view", "report.view",
         ],
     },
     "VIEWER": {

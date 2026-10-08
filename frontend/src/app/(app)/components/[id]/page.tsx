@@ -94,7 +94,7 @@ function Activity({ id }: { id: number }) {
   if (!data?.results.length) return <p className="text-sm text-slate-500">No recorded activity.</p>;
   return (
     <ol className="space-y-3">
-      {data.results.map((e) => {
+      {data.results.map((e: any) => {
         const changed = e.action === "UPDATE" && e.new_value ? Object.keys(e.new_value) : [];
         return (
           <li key={e.id} className="text-sm">
@@ -160,7 +160,7 @@ export default function ComponentDetailPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
-          <Card title={c.name} actions={<div className="flex gap-1.5"><LifecycleBadge value={c.lifecycle_status} /><Badge tone={c.status === "ACTIVE" ? "blue" : "slate"}>{STATUS_LABELS[c.status]}</Badge></div>}>
+          <Card title={c.name} actions={<div className="flex gap-1.5"><LifecycleBadge value={c.lifecycle_status} /><Badge tone={c.status === "ACTIVE" ? "blue" : "slate"}>{STATUS_LABELS[c.status as keyof typeof STATUS_LABELS]}</Badge></div>}>
             <DescriptionList items={[
               { label: "MPN", value: c.mpn && <span className="pn">{c.mpn}</span> },
               { label: "Manufacturer", value: c.manufacturer?.name },
@@ -187,7 +187,7 @@ export default function ComponentDetailPage() {
             {c.specifications.length === 0 ? <p className="text-sm text-slate-500">No specification values recorded.</p> : (
               <table className="w-full text-sm">
                 <tbody className="divide-y divide-slate-100">
-                  {c.specifications.map((s) => (
+                  {c.specifications.map((s: any) => (
                     <tr key={s.definition}>
                       <th scope="row" className="w-1/2 py-1.5 pr-4 text-left font-normal text-slate-500">{s.name}</th>
                       <td className="py-1.5 font-medium text-slate-900">{s.display_value}</td>
@@ -201,7 +201,7 @@ export default function ComponentDetailPage() {
           <Card title="Aliases">
             {c.aliases.length === 0 ? <p className="text-sm text-slate-500">No aliases.</p> : (
               <ul className="divide-y divide-slate-100 text-sm">
-                {c.aliases.map((a) => (
+                {c.aliases.map((a: any) => (
                   <li key={a.id ?? a.alias} className="flex items-center justify-between gap-2 py-1.5">
                     <span className="pn">{a.alias}</span>
                     <span className="text-xs text-slate-500">{aliasLabel(a.alias_type)}</span>

@@ -16,11 +16,11 @@ export default function RevDetail() {
   
   const { data: rev, isLoading } = useQuery<BOMRevision>({
     queryKey: ["bom_revision", revId],
-    queryFn: () => api(`/api/bom-revisions/${revId}/`),
+    queryFn: () => api(`/bom-revisions/${revId}/`),
   });
 
   const releaseMut = useMutation({
-    mutationFn: () => api(`/api/bom-revisions/${revId}/release/`, { method: "POST" }),
+    mutationFn: () => api(`/bom-revisions/${revId}/release/`, { method: "POST" }),
     onSuccess: () => {
       toast.success("BOM Released Successfully!");
       qc.invalidateQueries({ queryKey: ["bom_revision", revId] });

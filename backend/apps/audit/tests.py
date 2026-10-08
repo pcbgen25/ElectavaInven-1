@@ -42,6 +42,7 @@ def test_dashboard_metrics(client_for, capacitor_category):
     data = eng.get("/api/dashboard").data
     assert data["metrics"]["total_components"]["value"] == 1
     assert data["metrics"]["obsolete_components"]["value"] == 1
-    assert data["metrics"]["low_stock"] == {"value": None, "available": False, "phase": 3}
+    assert data["metrics"]["low_stock"]["value"] == 0
+    assert data["metrics"]["low_stock"]["phase"] == 3
     assert data["recent_components"][0]["name"] == "C"
     assert all(a["action"] != "LOGIN" for a in data["recent_activity"])

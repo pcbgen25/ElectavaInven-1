@@ -65,7 +65,7 @@ export default function DashboardPage() {
             <Card title="Recently updated components" actions={<Link href="/components?ordering=-updated_at" className="text-xs text-blue-700 hover:underline">View all</Link>}>
               {data.recent_components.length === 0 ? <EmptyState title="No components yet" /> : (
                 <ul className="-my-2 divide-y divide-slate-100">
-                  {data.recent_components.map((c) => (
+                  {data.recent_components.map((c: any) => (
                     <li key={c.id}>
                       <Link href={`/components/${c.id}`} className="flex items-center gap-3 py-2 hover:bg-slate-50">
                         <div className="min-w-0 flex-1">
@@ -84,7 +84,7 @@ export default function DashboardPage() {
             <Card title="Recent activity" actions={can("audit.view") && <Link href="/settings/audit-log" className="text-xs text-blue-700 hover:underline">Audit log</Link>}>
               {data.recent_activity.length === 0 ? <EmptyState title="No activity yet" /> : (
                 <ul className="-my-2 divide-y divide-slate-100">
-                  {data.recent_activity.map((a) => (
+                  {data.recent_activity.map((a: any) => (
                     <li key={a.id} className="py-2 text-sm">
                       <span className="font-medium text-slate-800">{a.user_email || "system"}</span>{" "}
                       <span className="text-slate-600">{ACTION_VERB[a.action] ?? a.action.toLowerCase()}</span>{" "}

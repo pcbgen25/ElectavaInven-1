@@ -18,7 +18,7 @@ export default function ProjectsPage() {
 
   const { data, isLoading, error } = useQuery<any>({
     queryKey: ["projects", page],
-    queryFn: () => api(`/api/projects/?page=${page}`),
+    queryFn: () => api(`/projects/?page=${page}`),
   });
 
   if (isLoading) return <div className="mt-10 flex justify-center"><Spinner /></div>;

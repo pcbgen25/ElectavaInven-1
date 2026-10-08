@@ -1,9 +1,11 @@
-from rest_framework.routers import DefaultRouter
-from .views import BOMViewSet, BOMRevisionViewSet, BOMItemViewSet
+from apps.core.routers import OptionalSlashRouter
 
-router = DefaultRouter()
-router.register(r'boms', BOMViewSet, basename='bom')
-router.register(r'bom-revisions', BOMRevisionViewSet, basename='bomrevision')
-router.register(r'bom-items', BOMItemViewSet, basename='bomitem')
+from .views import BOMItemViewSet, BOMRevisionViewSet, BOMViewSet
+
+# Same router as Phase 1: trailing slash optional, no browsable API root.
+router = OptionalSlashRouter()
+router.register("boms", BOMViewSet, basename="bom")
+router.register("bom-revisions", BOMRevisionViewSet, basename="bomrevision")
+router.register("bom-items", BOMItemViewSet, basename="bomitem")
 
 urlpatterns = router.urls

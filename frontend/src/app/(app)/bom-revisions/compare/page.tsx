@@ -16,13 +16,13 @@ export default function ComparePage() {
 
   const { data: bom } = useQuery<any>({
     queryKey: ["boms", bomId],
-    queryFn: () => api(`/api/boms/${bomId}/`),
+    queryFn: () => api(`/boms/${bomId}/`),
     enabled: !!bomId
   });
 
   const { data: diffs, isLoading, refetch } = useQuery<any>({
     queryKey: ["bom_compare", revA, revB],
-    queryFn: () => api(`/api/bom-revisions/compare/?rev_a=${revA}&rev_b=${revB}`),
+    queryFn: () => api(`/bom-revisions/compare/?rev_a=${revA}&rev_b=${revB}`),
     enabled: false
   });
 

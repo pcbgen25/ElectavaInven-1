@@ -1,168 +1,241 @@
-from rest_framework import viewsets, status
+"""Inventory REST API. Views validate input and delegate every stock change to ``services``.
+
+Permission codes come from ``apps.accounts.rbac_catalog``; ``HasRBACPermission`` (the global default)
+resolves them per action. Anything not mapped is denied.
+"""
+from drf_spectacular.utils import OpenApiParameter, extend_schema
+from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import F
-from .models import Warehouse, WarehouseLocation, InventoryItem, StockTransaction, StockReservation
-from .serializers import (WarehouseSerializer, WarehouseLocationSerializer, 
-    InventoryItemSerializer, StockTransactionSerializer, StockReservationSerializer,
-    StockOperationSerializer, StockTransferSerializer)
-from .services import execute_stock_operation, transfer_stock, reserve_stock, release_reservation
-from apps.core.permissions import HasRBACPermission
-from apps.components.models import Component
 
-class WarehouseViewSet(viewsets.ModelViewSet):
-    queryset = Warehouse.objects.all()
+from apps.audit.mixins import AuditedModelViewSetMixin
+from apps.core.exceptions import Conflict
+
+from . import services
+from .filters import InventoryItemFilter, StockReservationFilter, StockTransactionFilter, WarehouseLocationFilter
+from .models import InventoryItem, StockReservation, StockTransaction, Warehouse, WarehouseLocation
+from .serializers import (
+    InventoryItemSerializer,
+    StockAdjustmentSerializer,
+    StockLevelsSerializer,
+    StockMovementSerializer,
+    StockReceiptSerializer,
+    StockReservationSerializer,
+    StockReserveSerializer,
+    StockTransactionSerializer,
+    StockTransferSerializer,
+    WarehouseLocationSerializer,
+    WarehouseSerializer,
+)
+
+VIEW = "inventory.view"
+WAREHOUSE_MANAGE = "inventory.warehouse_manage"
+WAREHOUSE_PERMS = {
+    "list": VIEW,
+    "retrieve": VIEW,
+    "create": WAREHOUSE_MANAGE,
+    "update": WAREHOUSE_MANAGE,
+    "partial_update": WAREHOUSE_MANAGE,
+    "destroy": WAREHOUSE_MANAGE,
+}
+
+
+class WarehouseViewSet(AuditedModelViewSetMixin, viewsets.ModelViewSet):
+    """DELETE deactivates (soft-deletes) a warehouse; it is refused while it still holds stock."""
+
     serializer_class = WarehouseSerializer
-    permission_classes = [HasRBACPermission]
-    required_permissions = {
-        'list': 'inventory.view',
-        'retrieve': 'inventory.view',
-        'create': 'inventory.manage',
-        'update': 'inventory.manage',
-        'partial_update': 'inventory.manage',
-        'destroy': 'inventory.manage',
-    }
+    queryset = Warehouse.objects.all()
+    filterset_fields = ["is_active"]
+    search_fields = ["code", "name", "description"]
+    ordering_fields = ["code", "name", "created_at"]
+    ordering = ["code"]
+    required_permissions = WAREHOUSE_PERMS
 
-    @action(detail=True, methods=['get'])
-    def locations(self, request, pk=None):
-        locations = WarehouseLocation.objects.filter(warehouse_id=pk)
-        return Response(WarehouseLocationSerializer(locations, many=True).data)
+    def check_can_delete(self, instance):
+        if instance.inventory_items.filter(quantity_on_hand__gt=0).exists():
+            raise Conflict("Warehouse still holds stock. Transfer or issue it before deactivating the warehouse.")
+        if instance.locations.filter(deleted_at__isnull=True).exists():
+            raise Conflict("Warehouse has active locations. Deactivate them first.")
 
-class WarehouseLocationViewSet(viewsets.ModelViewSet):
-    queryset = WarehouseLocation.objects.all()
+
+class WarehouseLocationViewSet(AuditedModelViewSetMixin, viewsets.ModelViewSet):
+    """DELETE deactivates (soft-deletes) a location; it is refused while it still holds stock."""
+
     serializer_class = WarehouseLocationSerializer
-    permission_classes = [HasRBACPermission]
+    queryset = WarehouseLocation.objects.select_related("warehouse")
+    filterset_class = WarehouseLocationFilter
+    search_fields = ["code", "name", "warehouse__code"]
+    ordering_fields = ["code", "name", "warehouse__code", "created_at"]
+    ordering = ["warehouse__code", "code"]
+    required_permissions = WAREHOUSE_PERMS
+
+    def check_can_delete(self, instance):
+        if instance.inventory_items.filter(quantity_on_hand__gt=0).exists():
+            raise Conflict("Location still holds stock. Transfer or issue it before deactivating the location.")
+        if instance.sub_locations.filter(deleted_at__isnull=True).exists():
+            raise Conflict("Location has active sub-locations.")
+
+
+class InventoryItemViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    """Stock balances (read-only). Only thresholds are writable, via ``PATCH /levels``."""
+
+    serializer_class = InventoryItemSerializer
+    filterset_class = InventoryItemFilter
+    search_fields = ["component__internal_part_number", "component__mpn", "component__name", "lot_batch"]
+    ordering_fields = [
+        "component__internal_part_number", "warehouse__code", "location__code", "quantity_on_hand",
+        "quantity_reserved", "available_qty", "updated_at",
+    ]
+    ordering = ["component__internal_part_number", "warehouse__code", "location__code"]
     required_permissions = {
-        'list': 'inventory.view',
-        'retrieve': 'inventory.view',
-        'create': 'inventory.manage',
-        'update': 'inventory.manage',
-        'partial_update': 'inventory.manage',
-        'destroy': 'inventory.manage',
+        "list": VIEW,
+        "retrieve": VIEW,
+        "summary": VIEW,
+        "levels": "inventory.manage",
     }
 
-class InventoryItemViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = InventoryItem.objects.select_related('component', 'warehouse', 'location').all()
-    serializer_class = InventoryItemSerializer
-    permission_classes = [HasRBACPermission]
-    required_permissions = {'list': 'inventory.view', 'retrieve': 'inventory.view', '*': 'inventory.view'}
-    filterset_fields = ['component', 'warehouse', 'location']
+    def get_queryset(self):
+        return services.annotate_stock_status(
+            InventoryItem.objects.select_related("component", "warehouse", "location")
+        )
 
-    @action(detail=False, methods=['get'])
-    def low_stock(self, request):
-        items = self.queryset.filter(quantity_on_hand__lte=F('reorder_level'))
-        page = self.paginate_queryset(items)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-        return Response(self.get_serializer(items, many=True).data)
+    @extend_schema(request=StockLevelsSerializer, responses=InventoryItemSerializer)
+    @action(detail=True, methods=["patch"])
+    def levels(self, request, pk=None):
+        item = self.get_object()
+        ser = StockLevelsSerializer(data=request.data, partial=True)
+        ser.is_valid(raise_exception=True)
+        services.set_stock_levels(item, request.user, request=request, **ser.validated_data)
+        return Response(self.get_serializer(self.get_queryset().get(pk=item.pk)).data)
 
-class StockTransactionViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = StockTransaction.objects.select_related('component', 'warehouse', 'location', 'performed_by').all()
+    @extend_schema(
+        parameters=[OpenApiParameter("component", int), OpenApiParameter("warehouse", int)],
+        responses={200: dict},
+    )
+    @action(detail=False, methods=["get"])
+    def summary(self, request):
+        """Dataset-wide totals (respects the same filters as the list)."""
+        qs = InventoryItem.objects.all()
+        if c := request.query_params.get("component"):
+            qs = qs.filter(component_id=c) if c.isdigit() else qs.none()
+        if w := request.query_params.get("warehouse"):
+            qs = qs.filter(warehouse_id=w) if w.isdigit() else qs.none()
+        return Response(services.stock_summary(qs))
+
+
+class StockTransactionViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
+    """Append-only ledger. No create/update/delete endpoints exist."""
+
     serializer_class = StockTransactionSerializer
-    permission_classes = [HasRBACPermission]
-    required_permissions = {'list': 'inventory.transaction_view', 'retrieve': 'inventory.transaction_view', '*': 'inventory.transaction_view'}
-    filterset_fields = ['component', 'warehouse', 'transaction_type', 'performed_by']
+    queryset = StockTransaction.objects.select_related("component", "warehouse", "location", "performed_by")
+    filterset_class = StockTransactionFilter
+    search_fields = ["component__internal_part_number", "component__mpn", "reference", "reason", "lot_batch"]
+    ordering_fields = ["timestamp", "quantity", "transaction_type"]
+    ordering = ["-timestamp", "-id"]
+    required_permissions = {"list": "inventory.transaction_view", "retrieve": "inventory.transaction_view"}
 
-class StockReservationViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = StockReservation.objects.all()
+
+class StockReservationViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
     serializer_class = StockReservationSerializer
-    permission_classes = [HasRBACPermission]
-    required_permissions = {'list': 'inventory.view', 'retrieve': 'inventory.view', '*': 'inventory.view'}
-    filterset_fields = ['component', 'warehouse', 'status']
+    queryset = StockReservation.objects.select_related(
+        "component", "warehouse", "location", "project", "created_by", "released_by"
+    )
+    filterset_class = StockReservationFilter
+    search_fields = ["component__internal_part_number", "component__mpn", "reference_id", "notes"]
+    ordering_fields = ["created_at", "quantity", "status"]
+    ordering = ["-created_at"]
+    required_permissions = {
+        "list": VIEW,
+        "retrieve": VIEW,
+        "release": "inventory.reserve",
+        "cancel": "inventory.reserve",
+    }
 
-class StockOperationViewSet(viewsets.ViewSet):
-    permission_classes = [HasRBACPermission]
-    required_permissions = {}
-    
-    def _execute_op(self, request, op_type):
-        serializer = StockOperationSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        
-        component = Component.objects.get(id=data['component_id'])
-        warehouse = Warehouse.objects.get(id=data['warehouse_id'])
-        location = WarehouseLocation.objects.filter(id=data['location_id']).first() if data.get('location_id') else None
-        
-        try:
-            txn, item = execute_stock_operation(
-                op_type,
-                component=component,
-                warehouse=warehouse,
-                location=location,
-                quantity=data['quantity'],
-                user=request.user,
-                reason=data.get('reason', ''),
-                notes=data.get('notes', ''),
-                reference_type=data.get('reference_type', ''),
-                reference_id=data.get('reference_id', ''),
-                lot_batch=data.get('lot_batch', '')
-            )
-            return Response(StockTransactionSerializer(txn).data, status=status.HTTP_201_CREATED)
-        except Exception as e:
-            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    @extend_schema(request=None, responses=StockReservationSerializer)
+    @action(detail=True, methods=["post"])
+    def release(self, request, pk=None):
+        self.get_object()  # 404 for unknown ids
+        res = services.release_reservation(pk, request.user, request=request)
+        return Response(StockReservationSerializer(res).data)
 
-    @action(detail=False, methods=['post'], required_permissions='inventory.receive')
+    @extend_schema(request=None, responses=StockReservationSerializer)
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        self.get_object()
+        res = services.cancel_reservation(pk, request.user, request=request)
+        return Response(StockReservationSerializer(res).data)
+
+
+class StockOperationViewSet(viewsets.GenericViewSet):
+    """Stock-changing operations. Each returns the created ledger row(s)."""
+
+    required_permissions = {
+        "receive": "inventory.receive",
+        "issue": "inventory.issue",
+        "adjust": "inventory.adjust",
+        "transfer": "inventory.transfer",
+        "reserve": "inventory.reserve",
+    }
+    serializer_class = StockMovementSerializer
+
+    def _movement(self, data) -> services.Movement:
+        return services.Movement(
+            component=data["component"], warehouse=data["warehouse"], location=data.get("location"),
+            quantity=data["quantity"], lot_batch=data.get("lot_batch", ""), reason=data.get("reason", ""),
+            notes=data.get("notes", ""), reference=data.get("reference", ""),
+            unit_cost=data.get("unit_cost"), currency=data.get("currency", ""),
+        )
+
+    def _validated(self, serializer_class):
+        ser = serializer_class(data=request_data(self.request))
+        ser.is_valid(raise_exception=True)
+        return ser.validated_data
+
+    @extend_schema(request=StockReceiptSerializer, responses={201: StockTransactionSerializer})
+    @action(detail=False, methods=["post"])
     def receive(self, request):
-        return self._execute_op(request, StockTransaction.TransactionType.RECEIPT)
+        txn, _ = services.receive_stock(self._movement(self._validated(StockReceiptSerializer)), request.user, request)
+        return Response(StockTransactionSerializer(txn).data, status=status.HTTP_201_CREATED)
 
-    @action(detail=False, methods=['post'], required_permissions='inventory.issue')
+    @extend_schema(request=StockMovementSerializer, responses={201: StockTransactionSerializer})
+    @action(detail=False, methods=["post"])
     def issue(self, request):
-        return self._execute_op(request, StockTransaction.TransactionType.ISSUE)
+        txn, _ = services.issue_stock(self._movement(self._validated(StockMovementSerializer)), request.user, request)
+        return Response(StockTransactionSerializer(txn).data, status=status.HTTP_201_CREATED)
 
-    @action(detail=False, methods=['post'], required_permissions='inventory.adjust')
+    @extend_schema(request=StockAdjustmentSerializer, responses={201: StockTransactionSerializer})
+    @action(detail=False, methods=["post"])
     def adjust(self, request):
-        # Determine if adjust in or out based on quantity payload convention, or explicit field
-        qty = float(request.data.get('quantity', 0))
-        op_type = StockTransaction.TransactionType.ADJUSTMENT_IN if qty > 0 else StockTransaction.TransactionType.ADJUSTMENT_OUT
-        request.data['quantity'] = abs(qty)
-        return self._execute_op(request, op_type)
+        data = self._validated(StockAdjustmentSerializer)
+        txn, _ = services.adjust_stock(self._movement(data), data["direction"], request.user, request)
+        return Response(StockTransactionSerializer(txn).data, status=status.HTTP_201_CREATED)
 
-    @action(detail=False, methods=['post'], required_permissions='inventory.transfer')
+    @extend_schema(request=StockTransferSerializer, responses={201: StockTransactionSerializer(many=True)})
+    @action(detail=False, methods=["post"])
     def transfer(self, request):
-        serializer = StockTransferSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        
-        component = Component.objects.get(id=data['component_id'])
-        from_warehouse = Warehouse.objects.get(id=data['from_warehouse_id'])
-        from_location = WarehouseLocation.objects.filter(id=data['from_location_id']).first() if data.get('from_location_id') else None
-        to_warehouse = Warehouse.objects.get(id=data['to_warehouse_id'])
-        to_location = WarehouseLocation.objects.filter(id=data['to_location_id']).first() if data.get('to_location_id') else None
-        
-        try:
-            out_txn, in_txn = transfer_stock(
-                component, from_warehouse, from_location, to_warehouse, to_location,
-                quantity=data['quantity'], user=request.user, reason=data.get('reason', ''), lot_batch=data.get('lot_batch', '')
-            )
-            return Response({"detail": "Transfer successful"}, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        d = self._validated(StockTransferSerializer)
+        out_txn, in_txn = services.transfer_stock(
+            d["component"], d["from_warehouse"], d.get("from_location"), d["to_warehouse"], d.get("to_location"),
+            d["quantity"], request.user, lot_batch=d["lot_batch"], reason=d["reason"], notes=d["notes"],
+            reference=d["reference"], request=request,
+        )
+        return Response(StockTransactionSerializer([out_txn, in_txn], many=True).data, status=status.HTTP_201_CREATED)
 
-    @action(detail=False, methods=['post'], required_permissions='inventory.reserve')
+    @extend_schema(request=StockReserveSerializer, responses={201: StockReservationSerializer})
+    @action(detail=False, methods=["post"])
     def reserve(self, request):
-        serializer = StockOperationSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        data = serializer.validated_data
-        
-        component = Component.objects.get(id=data['component_id'])
-        warehouse = Warehouse.objects.get(id=data['warehouse_id'])
-        location = WarehouseLocation.objects.filter(id=data['location_id']).first() if data.get('location_id') else None
-        
-        try:
-            res = reserve_stock(
-                component, warehouse, location, data['quantity'], request.user,
-                reference_type=data.get('reference_type', ''), reference_id=data.get('reference_id', ''),
-                lot_batch=data.get('lot_batch', '')
-            )
-            return Response(StockReservationSerializer(res).data, status=status.HTTP_201_CREATED)
-        except Exception as e:
-            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+        d = self._validated(StockReserveSerializer)
+        res = services.reserve_stock(
+            d["component"], d["warehouse"], d.get("location"), d["quantity"], request.user,
+            lot_batch=d["lot_batch"], project=d.get("project"), bom_revision=d.get("bom_revision"),
+            reference_type=d["reference_type"], reference_id=d["reference_id"], notes=d["notes"], request=request,
+        )
+        return Response(StockReservationSerializer(res).data, status=status.HTTP_201_CREATED)
 
-    @action(detail=True, methods=['post'], required_permissions='inventory.reserve')
-    def release_reservation(self, request, pk=None):
-        try:
-            res = release_reservation(pk, request.user)
-            return Response(StockReservationSerializer(res).data)
-        except Exception as e:
-            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+def request_data(request):
+    """Plain dict copy of the request body (JSON or form). Never mutate ``request.data`` itself."""
+    data = request.data
+    if hasattr(data, "dict"):
+        return data.dict()
+    return dict(data)

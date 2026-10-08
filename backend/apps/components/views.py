@@ -182,6 +182,7 @@ class ComponentViewSet(viewsets.ModelViewSet):
     def upload_image(self, request, pk=None):
         return self._upload(request, "image")
 
+    @extend_schema(request=None, responses=ComponentDetailSerializer)
     @upload_image.mapping.delete
     def delete_image(self, request, pk=None):
         return self._remove(request, "image")
@@ -191,6 +192,7 @@ class ComponentViewSet(viewsets.ModelViewSet):
     def upload_datasheet(self, request, pk=None):
         return self._upload(request, "datasheet_file")
 
+    @extend_schema(request=None, responses=ComponentDetailSerializer)
     @upload_datasheet.mapping.delete
     def delete_datasheet(self, request, pk=None):
         return self._remove(request, "datasheet_file")

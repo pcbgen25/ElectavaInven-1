@@ -40,7 +40,7 @@ function UserModal({ user, open, onClose }: { user: User | null; open: boolean; 
     if (!open) return;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- reset form when opened
     setV(Object.fromEntries(PROFILE_FIELDS.map(([k]) => [k, user?.[k] ?? ""])));
-    setRoleCodes(user?.roles.map((r) => r.code) ?? []);
+    setRoleCodes(user?.roles.map((r: any) => r.code) ?? []);
     setActive(user?.is_active ?? true);
     setErrors({});
     setFormError(null);
@@ -88,7 +88,7 @@ function UserModal({ user, open, onClose }: { user: User | null; open: boolean; 
           {errors.role_codes && <p className="text-xs text-red-600">{errors.role_codes.join(" ")}</p>}
           {errors.roles && <p className="text-xs text-red-600">{errors.roles.join(" ")}</p>}
           <div className="grid gap-2 sm:grid-cols-2">
-            {roles?.map((r) => (
+            {roles?.map((r: any) => (
               <label key={r.code} className="flex items-start gap-2 rounded border border-slate-200 p-2 text-sm">
                 <input type="checkbox" className="mt-0.5 h-4 w-4" checked={roleCodes.includes(r.code)}
                   onChange={(e) => setRoleCodes((s) => e.target.checked ? [...s, r.code] : s.filter((c) => c !== r.code))} />
@@ -151,7 +151,7 @@ export default function UsersPage() {
     { key: "email", header: "Email", sortKey: "email", render: (u) => <span className="font-medium text-slate-900">{u.email}</span>, csv: (u) => u.email },
     { key: "name", header: "Name", sortKey: "first_name", render: (u) => u.full_name || "—", csv: (u) => u.full_name },
     { key: "dept", header: "Department", render: (u) => u.department || "—", csv: (u) => u.department },
-    { key: "roles", header: "Roles", render: (u) => <div className="flex flex-wrap gap-1">{u.roles.map((r) => <Badge key={r.code} tone="violet">{r.name}</Badge>)}</div>, csv: (u) => u.roles.map((r) => r.code).join(" ") },
+    { key: "roles", header: "Roles", render: (u) => <div className="flex flex-wrap gap-1">{u.roles.map((r: any) => <Badge key={r.code} tone="violet">{r.name}</Badge>)}</div>, csv: (u) => u.roles.map((r: any) => r.code).join(" ") },
     { key: "active", header: "Status", render: (u) => u.is_active ? <Badge tone="green">Active</Badge> : <Badge tone="red">Inactive</Badge>, csv: (u) => (u.is_active ? "active" : "inactive") },
     { key: "login", header: "Last login", sortKey: "last_login", render: (u) => <span className="whitespace-nowrap text-slate-500">{formatDateTime(u.last_login)}</span>, csv: (u) => u.last_login },
     { key: "actions", header: "", render: (u) => (
@@ -179,7 +179,7 @@ export default function UsersPage() {
         toolbar={<>
           <Select aria-label="Role" className="h-8 w-auto text-xs" value={list.filters.roles__code ?? ""} onChange={(e) => list.update({ roles__code: e.target.value })}>
             <option value="">Role: all</option>
-            {roles?.map((r) => <option key={r.code} value={r.code}>{r.name}</option>)}
+            {roles?.map((r: any) => <option key={r.code} value={r.code}>{r.name}</option>)}
           </Select>
           <Select aria-label="Status" className="h-8 w-auto text-xs" value={list.filters.is_active ?? ""} onChange={(e) => list.update({ is_active: e.target.value })}>
             <option value="">Status: all</option><option value="true">Active</option><option value="false">Inactive</option>
@@ -187,7 +187,7 @@ export default function UsersPage() {
         </>}
         mobileCard={(u) => (
           <div className="flex items-center justify-between gap-2">
-            <div className="min-w-0"><div className="truncate font-medium">{u.email}</div><div className="text-xs text-slate-500">{u.roles.map((r) => r.name).join(", ") || "No roles"}{!u.is_active && " · inactive"}</div></div>
+            <div className="min-w-0"><div className="truncate font-medium">{u.email}</div><div className="text-xs text-slate-500">{u.roles.map((r: any) => r.name).join(", ") || "No roles"}{!u.is_active && " · inactive"}</div></div>
             <Button size="sm" variant="ghost" aria-label="Edit" onClick={() => setEditing(u)}><Pencil className="h-3.5 w-3.5" /></Button>
           </div>
         )}

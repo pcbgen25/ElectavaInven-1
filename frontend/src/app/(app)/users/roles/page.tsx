@@ -26,7 +26,7 @@ export default function RolesPage() {
   const roles = useQuery<any>({ queryKey: ["roles"], queryFn: async () => (await api<Paginated<Role>>("roles", { query: { page_size: 200, ordering: "name" } })).results, enabled: allowed });
   const perms = useQuery<any>({ queryKey: ["permissions"], queryFn: () => api<Permission[]>("permissions"), enabled: allowed });
 
-  const role = roles.data?.find((r) => r.id === selected) ?? roles.data?.[0];
+  const role = roles.data?.find((r: any) => r.id === selected) ?? roles.data?.[0];
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- load the selected role's permissions into the editable draft
     if (role) setDraft(new Set(role.permission_codes));
@@ -34,7 +34,7 @@ export default function RolesPage() {
 
   const byModule = useMemo(() => {
     const m = new Map<string, Permission[]>();
-    perms.data?.forEach((p) => m.set(p.module, [...(m.get(p.module) ?? []), p]));
+    perms.data?.forEach((p: any) => m.set(p.module, [...(m.get(p.module) ?? []), p]));
     return [...m.entries()];
   }, [perms.data]);
 
@@ -43,7 +43,7 @@ export default function RolesPage() {
   if (roles.error || perms.error) return <ErrorState message={((roles.error ?? perms.error) as Error).message} />;
 
   const isSuper = role?.code === "SUPER_ADMIN";
-  const dirty = role && (draft.size !== role.permission_codes.length || role.permission_codes.some((c) => !draft.has(c)));
+  const dirty = role && (draft.size !== role.permission_codes.length || role.permission_codes.some((c: any) => !draft.has(c)));
 
   const save = async () => {
     if (!role) return;
@@ -64,7 +64,7 @@ export default function RolesPage() {
       <div className="grid gap-4 lg:grid-cols-4">
         <Card title="Roles" className="lg:col-span-1">
           <ul className="-mx-2 space-y-0.5">
-            {roles.data?.map((r) => (
+            {roles.data?.map((r: any) => (
               <li key={r.id}>
                 <button onClick={() => setSelected(r.id)} className={cn("flex w-full items-center justify-between rounded px-2 py-1.5 text-left text-sm", role?.id === r.id ? "bg-blue-50 text-blue-800" : "hover:bg-slate-50")}>
                   <span>{r.name}</span><span className="text-xs text-slate-400">{r.user_count}</span>

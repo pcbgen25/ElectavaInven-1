@@ -123,7 +123,7 @@ export default function CategoriesPage() {
                         <tr><th className="px-4 py-2">Field</th><th className="px-2 py-2">Type</th><th className="px-2 py-2">Unit</th><th className="px-2 py-2">Flags</th><th className="px-4 py-2" /></tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {defs.data.map((d) => {
+                        {defs.data.map((d: any) => {
                           const inherited = d.category !== selected.id;
                           return (
                             <tr key={d.id} className={cn(!d.is_active && "opacity-50")}>

@@ -12,7 +12,7 @@ export default function BomPage() {
   const [page, setPage] = useState(1);
   const { data, isLoading, error } = useQuery<any>({
     queryKey: ["boms", page],
-    queryFn: () => api(`/api/boms/?page=${page}`),
+    queryFn: () => api(`/boms/?page=${page}`),
   });
 
   if (isLoading) return <div className="mt-10 flex justify-center"><Spinner /></div>;

@@ -7,11 +7,8 @@ from apps.components.models import Category, Component
 from apps.manufacturers.models import Manufacturer
 
 PENDING_METRICS = {
-    "projects": 2,
-    "active_boms": 2,
-    "low_stock": 3,
-    "out_of_stock": 3,
-    "inventory_value": 3,
+    # Valuation needs purchase costing, which arrives with purchasing.
+    "inventory_value": 4,
     "pending_purchase_requests": 4,
     "pending_purchase_orders": 4,
 }
@@ -22,8 +19,8 @@ COMPONENT_ENTITY_TYPES = [
 ]
 
 
-def _metric(value):
-    return {"value": value, "available": True, "phase": 1}
+def _metric(value, phase: int = 1):
+    return {"value": value, "available": True, "phase": phase}
 
 
 def dashboard_summary(user) -> dict:
@@ -75,6 +72,22 @@ def dashboard_summary(user) -> dict:
             }
             for a in activity[:10]
         ]
+    if user.has_rbac_permission("project.view"):
+        from apps.projects.models import Project
+
+        data["metrics"]["projects"] = _metric(
+            Project.objects.exclude(status__in=[Project.Status.COMPLETED, Project.Status.CANCELLED]).count(), phase=2
+        )
+    if user.has_rbac_permission("bom.view"):
+        from apps.bom.models import BOM
+
+        data["metrics"]["active_boms"] = _metric(BOM.objects.exclude(status=BOM.Status.OBSOLETE).count(), phase=2)
+    if user.has_rbac_permission("inventory.view"):
+        from apps.inventory.services import stock_summary
+
+        summary = stock_summary()
+        data["metrics"]["low_stock"] = _metric(summary["low_stock"], phase=3)
+        data["metrics"]["out_of_stock"] = _metric(summary["out_of_stock"], phase=3)
     for key, phase in PENDING_METRICS.items():
         data["metrics"][key] = {"value": None, "available": False, "phase": phase}
     return data

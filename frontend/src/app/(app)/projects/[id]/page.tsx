@@ -15,12 +15,12 @@ export default function ProjectDetail() {
 
   const { data: project, isLoading, error } = useQuery<Project>({
     queryKey: ["projects", projectId],
-    queryFn: () => api(`/api/projects/${projectId}/`),
+    queryFn: () => api(`/projects/${projectId}/`),
   });
 
   const { data: boms, isLoading: bomsLoading } = useQuery<any>({
     queryKey: ["project_boms", projectId],
-    queryFn: () => api(`/api/boms/?project=${projectId}`),
+    queryFn: () => api(`/boms/?project=${projectId}`),
   });
 
   if (isLoading) return <div className="mt-10 flex justify-center"><Spinner /></div>;
