@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 
 /** Navigation. `phase` > current phase means the module is NOT implemented yet and is shown disabled. */
-export const CURRENT_PHASE = 3;
+export const CURRENT_PHASE = 4;
 
 export interface NavChild {
   label: string;
@@ -83,9 +83,10 @@ export const NAV: NavItem[] = [
     phase: 4,
     permission: "purchase.view",
     children: [
+      { label: "Overview", href: "/purchasing", phase: 4 },
       { label: "Purchase Requests", href: "/purchasing/requests", phase: 4 },
       { label: "Purchase Orders", href: "/purchasing/orders", phase: 4 },
-      { label: "Receiving", href: "/purchasing/receiving", phase: 4 },
+      { label: "Receiving (GRN)", href: "/purchasing/receiving", phase: 4 },
     ],
   },
   { label: "Documents", href: "/documents", icon: FileText, phase: 5, permission: "document.view" },

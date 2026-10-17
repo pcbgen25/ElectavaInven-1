@@ -175,11 +175,11 @@ def _png_bytes():
 
 def test_image_upload_validation(eng, capacitor_category):
     cid = _create_cap(eng, capacitor_category).data["id"]
-    ok = eng.post(f"/api/components/{cid}/image", {"file": SimpleUploadedFile("a.png", _png_bytes(), "image/png")},
+    ok = eng.post(f"/api/components/{cid}/image", {"file": SimpleUploadedFile("client_name.png", _png_bytes(), "image/png")},
                   format="multipart")
     assert ok.status_code == 200, ok.content
     assert ok.data["image_url"].startswith("/media/components/images/")
-    assert "a.png" not in ok.data["image_url"]  # client filename never used for storage
+    assert "client_name.png" not in ok.data["image_url"]  # client filename never used for storage
     fake = eng.post(f"/api/components/{cid}/image",
                     {"file": SimpleUploadedFile("evil.png", b"<script>alert(1)</script>", "image/png")}, format="multipart")
     assert fake.status_code == 400

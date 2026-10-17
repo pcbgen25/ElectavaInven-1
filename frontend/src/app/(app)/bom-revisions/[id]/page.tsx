@@ -1,16 +1,17 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle, Lock } from "lucide-react";
-import { useParams } from "next/navigation";
+import { CheckCircle, Lock, ShoppingCart } from "lucide-react";
+import { useParams, useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { Badge, ErrorState, Spinner } from "@/components/ui/primitives";
-import { api } from "@/lib/api";
-import type { BOMItem, BOMRevision } from "@/lib/types";
+import { api, ApiError } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
+import type { BOMItem, BOMRevision, PurchaseRequest } from "@/lib/types";
 
 interface AvailabilityItem {
   component_id: number;
@@ -38,7 +39,9 @@ interface AvailabilityResponse {
 
 export default function RevDetail() {
   const params = useParams();
+  const router = useRouter();
   const qc = useQueryClient();
+  const { can } = useAuth();
   const revId = String(params.id || "");
   const [buildQty, setBuildQty] = useState(1);
 
@@ -60,6 +63,24 @@ export default function RevDetail() {
       qc.invalidateQueries({ queryKey: ["bom_revision", revId] });
     },
     onError: () => toast.error("Failed to release BOM. Check permissions."),
+  });
+
+  const shortagePrMut = useMutation({
+    mutationFn: () =>
+      api<PurchaseRequest>("purchasing/requests/from-bom-shortage", {
+        method: "POST",
+        body: {
+          bom_revision: Number(revId),
+          build_quantity: String(buildQty),
+          priority: "HIGH",
+          apply_moq: true,
+        },
+      }),
+    onSuccess: (pr) => {
+      toast.success(`Purchase Request ${pr.request_number} created for shortages!`);
+      router.push(`/purchasing/requests/${pr.id}`);
+    },
+    onError: (e) => toast.error(e instanceof ApiError ? e.message : "Failed to create shortage PR"),
   });
 
   if (isLoading)
@@ -136,18 +157,28 @@ export default function RevDetail() {
                   : "All components have sufficient available stock."}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              <label htmlFor="build-qty" className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                Build Quantity:
-              </label>
-              <input
-                id="build-qty"
-                type="number"
-                min={1}
-                value={buildQty}
-                onChange={(e) => setBuildQty(Math.max(1, Number(e.target.value) || 1))}
-                className="w-24 rounded border border-slate-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
-              />
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <label htmlFor="build-qty" className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                  Build Quantity:
+                </label>
+                <input
+                  id="build-qty"
+                  type="number"
+                  min={1}
+                  value={buildQty}
+                  onChange={(e) => setBuildQty(Math.max(1, Number(e.target.value) || 1))}
+                  className="w-24 rounded border border-slate-300 px-2 py-1 text-sm dark:border-zinc-700 dark:bg-zinc-900"
+                />
+              </div>
+              {availability.components_short > 0 && can("purchase.create") && (
+                <Button
+                  loading={shortagePrMut.isPending}
+                  onClick={() => shortagePrMut.mutate()}
+                >
+                  <ShoppingCart className="h-4 w-4" /> Create PR for Shortages
+                </Button>
+              )}
             </div>
           </div>
 

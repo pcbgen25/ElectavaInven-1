@@ -333,3 +333,280 @@ export interface StockTransaction {
     performed_by_name: string;
     timestamp: string;
 }
+
+// PHASE 4 TYPES — SUPPLIERS & PURCHASING
+export type SupplierStatus = "ACTIVE" | "ON_HOLD" | "INACTIVE";
+
+export interface SupplierContact {
+  id: number;
+  supplier: number;
+  name: string;
+  role: string;
+  email: string;
+  phone: string;
+  is_primary: boolean;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Supplier {
+  id: number;
+  code: string;
+  name: string;
+  legal_name: string;
+  website: string;
+  email: string;
+  phone: string;
+  country: string;
+  address: string;
+  currency: string;
+  payment_terms: string;
+  tax_id: string;
+  lead_time_days: number | null;
+  rating: number | null;
+  status: SupplierStatus;
+  is_active: boolean;
+  notes: string;
+  part_count: number;
+  purchase_order_count: number;
+  contacts: SupplierContact[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SupplierPriceBreak {
+  id?: number;
+  min_quantity: string;
+  unit_price: string;
+  currency: string;
+  created_at?: string;
+}
+
+export interface SupplierPriceHistory {
+  id: number;
+  supplier_part: number;
+  min_quantity: string;
+  unit_price: string;
+  currency: string;
+  source: string;
+  reference: string;
+  recorded_by: number | null;
+  recorded_by_name: string | null;
+  recorded_at: string;
+}
+
+export interface SupplierPart {
+  id: number;
+  supplier: number;
+  supplier_code: string;
+  supplier_name: string;
+  supplier_status: SupplierStatus;
+  component: number;
+  component_internal_part_number: string;
+  component_mpn: string;
+  component_name: string;
+  supplier_part_number: string;
+  manufacturer_part_number: string;
+  packaging: string;
+  currency: string;
+  unit_price: string;
+  moq: string;
+  order_multiple: string;
+  lead_time_days: number | null;
+  is_preferred: boolean;
+  is_active: boolean;
+  product_url: string;
+  notes: string;
+  price_breaks: SupplierPriceBreak[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SupplierOfferComparison {
+  supplier_part_id: number;
+  supplier_id: number;
+  supplier_code: string;
+  supplier_name: string;
+  supplier_status: SupplierStatus;
+  supplier_part_number: string;
+  manufacturer_part_number: string;
+  packaging: string;
+  currency: string;
+  moq: string;
+  order_multiple: string;
+  lead_time_days: number | null;
+  is_preferred: boolean;
+  product_url: string;
+  requested_quantity: string;
+  effective_order_quantity: string;
+  effective_unit_price: string;
+  extended_price: string;
+}
+
+export type PurchaseRequestStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED" | "ORDERED" | "CANCELLED";
+export type PurchasePriority = "LOW" | "NORMAL" | "HIGH" | "URGENT";
+
+export interface PurchaseRequestItem {
+  id: number;
+  component: number;
+  component_internal_part_number: string;
+  component_mpn: string;
+  component_name: string;
+  preferred_supplier: number | null;
+  preferred_supplier_code: string | null;
+  preferred_supplier_name: string | null;
+  supplier_part: number | null;
+  supplier_part_number: string | null;
+  quantity: string;
+  estimated_unit_price: string | null;
+  currency: string;
+  notes: string;
+}
+
+export interface PurchaseRequest {
+  id: number;
+  request_number: string;
+  title: string;
+  project: number | null;
+  project_code: string | null;
+  project_name: string | null;
+  bom_revision: number | null;
+  bom_revision_label: string | null;
+  build_quantity: string;
+  status: PurchaseRequestStatus;
+  priority: PurchasePriority;
+  needed_by: string | null;
+  notes: string;
+  submitted_by_name: string | null;
+  submitted_at: string | null;
+  reviewed_by_name: string | null;
+  reviewed_at: string | null;
+  review_notes: string;
+  item_count: number;
+  estimated_total: string;
+  items: PurchaseRequestItem[];
+  created_by_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PurchaseOrderStatus =
+  | "DRAFT"
+  | "APPROVED"
+  | "SENT"
+  | "PARTIALLY_RECEIVED"
+  | "RECEIVED"
+  | "CLOSED"
+  | "CANCELLED";
+
+export interface PurchaseOrderItem {
+  id: number;
+  component: number;
+  component_internal_part_number: string;
+  component_mpn: string;
+  component_name: string;
+  supplier_part: number | null;
+  purchase_request_item: number | null;
+  supplier_part_number_snapshot: string;
+  mpn_snapshot: string;
+  description_snapshot: string;
+  quantity_ordered: string;
+  quantity_received: string;
+  quantity_outstanding: string;
+  unit_price: string;
+  line_total: string;
+  expected_date: string | null;
+  notes: string;
+}
+
+export interface PurchaseOrder {
+  id: number;
+  po_number: string;
+  supplier: number;
+  supplier_code: string;
+  supplier_name: string;
+  purchase_request: number | null;
+  purchase_request_number: string | null;
+  project: number | null;
+  project_code: string | null;
+  project_name: string | null;
+  bom_revision: number | null;
+  default_warehouse: number | null;
+  default_warehouse_code: string | null;
+  default_warehouse_name: string | null;
+  status: PurchaseOrderStatus;
+  currency: string;
+  exchange_rate: string;
+  subtotal: string;
+  tax_amount: string;
+  shipping_amount: string;
+  discount_amount: string;
+  total_amount: string;
+  payment_terms_snapshot: string;
+  order_date: string | null;
+  expected_delivery_date: string | null;
+  approved_by_name: string | null;
+  approved_at: string | null;
+  sent_by_name: string | null;
+  sent_at: string | null;
+  notes: string;
+  item_count: number;
+  items: PurchaseOrderItem[];
+  created_by_name: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GoodsReceiptItem {
+  id: number;
+  purchase_order_item: number;
+  component: number;
+  component_internal_part_number: string;
+  component_mpn: string;
+  component_name: string;
+  warehouse: number;
+  warehouse_code: string;
+  location: number | null;
+  location_code: string | null;
+  lot_batch: string;
+  quantity_received: string;
+  unit_cost_snapshot: string;
+  currency_snapshot: string;
+  exchange_rate_snapshot: string;
+  stock_transaction: number | null;
+  notes: string;
+}
+
+export interface GoodsReceipt {
+  id: number;
+  receipt_number: string;
+  purchase_order: number;
+  po_number: string;
+  supplier: number;
+  supplier_code: string;
+  supplier_name: string;
+  warehouse: number;
+  warehouse_code: string;
+  warehouse_name: string;
+  status: "DRAFT" | "POSTED";
+  supplier_delivery_note: string;
+  idempotency_key: string | null;
+  received_by_name: string | null;
+  received_at: string | null;
+  notes: string;
+  items: GoodsReceiptItem[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PurchasingSummary {
+  open_requests: number;
+  pending_approval_requests: number;
+  approved_requests: number;
+  open_orders: number;
+  pending_approval_orders: number;
+  awaiting_delivery_orders: number;
+  posted_receipts: number;
+  open_po_commitment: string;
+}

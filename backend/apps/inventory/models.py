@@ -162,13 +162,14 @@ class StockTransaction(models.Model):
         RELEASE_RESERVATION = "RELEASE_RESERVATION", "Release Reservation"
 
     class SourceType(models.TextChoices):
-        """What created the transaction. Phase 4 will add GOODS_RECEIPT."""
+        """What created the transaction."""
 
         MANUAL = "MANUAL", "Manual operation"
         TRANSFER = "TRANSFER", "Stock transfer"
         RESERVATION = "RESERVATION", "Stock reservation"
         PROJECT = "PROJECT", "Project"
         BOM_REVISION = "BOM_REVISION", "BOM revision"
+        GOODS_RECEIPT = "GOODS_RECEIPT", "Goods receipt"
 
     transaction_type = models.CharField(max_length=24, choices=TransactionType.choices)
     component = models.ForeignKey("components.Component", on_delete=models.PROTECT, related_name="stock_transactions")

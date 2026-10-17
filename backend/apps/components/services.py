@@ -204,6 +204,9 @@ def rebuild_search_document(component: Component) -> None:
     parts += list(component.aliases.values_list("alias", flat=True))
     for spec in component.specifications.select_related("definition"):
         parts += [spec.definition.name, display_spec_value(spec), spec.value_string]
+    if hasattr(component, "supplier_parts"):
+        for sp in component.supplier_parts.filter(deleted_at__isnull=True).select_related("supplier"):
+            parts += [sp.supplier_part_number, sp.supplier.name, sp.supplier.code]
     doc = " | ".join(p for p in parts if p)
     Component.all_objects.filter(pk=component.pk).update(search_document=doc)
     component.search_document = doc

@@ -1,17 +1,15 @@
 """Dashboard metrics. Metrics for modules not built yet are returned as
 ``{"value": null, "available": false, "phase": N}`` so the UI can say so honestly."""
-from django.db.models import Count, Q
+from decimal import Decimal
+
+from django.db.models import Count, DecimalField, F, OuterRef, Q, Subquery, Sum
+from django.db.models.functions import Coalesce
 
 from apps.audit.models import AuditAction, AuditLog
 from apps.components.models import Category, Component
 from apps.manufacturers.models import Manufacturer
 
-PENDING_METRICS = {
-    # Valuation needs purchase costing, which arrives with purchasing.
-    "inventory_value": 4,
-    "pending_purchase_requests": 4,
-    "pending_purchase_orders": 4,
-}
+PENDING_METRICS: dict[str, int] = {}
 
 COMPONENT_ENTITY_TYPES = [
     "components.component", "components.category", "components.package",
@@ -83,11 +81,49 @@ def dashboard_summary(user) -> dict:
 
         data["metrics"]["active_boms"] = _metric(BOM.objects.exclude(status=BOM.Status.OBSOLETE).count(), phase=2)
     if user.has_rbac_permission("inventory.view"):
+        from apps.inventory.models import InventoryItem
         from apps.inventory.services import stock_summary
+        from apps.suppliers.models import SupplierPart
 
         summary = stock_summary()
         data["metrics"]["low_stock"] = _metric(summary["low_stock"], phase=3)
         data["metrics"]["out_of_stock"] = _metric(summary["out_of_stock"], phase=3)
+
+        best_price_sq = (
+            SupplierPart.objects.filter(component_id=OuterRef("component_id"), is_active=True, deleted_at__isnull=True)
+            .order_by("-is_preferred", "unit_price")
+            .values("unit_price")[:1]
+        )
+        val_field = DecimalField(max_digits=18, decimal_places=4)
+        inv_val = (
+            InventoryItem.objects.annotate(
+                est_price=Coalesce(Subquery(best_price_sq), Decimal("0.000000"), output_field=DecimalField(max_digits=15, decimal_places=6))
+            )
+            .aggregate(
+                total=Coalesce(Sum(F("quantity_on_hand") * F("est_price"), output_field=val_field), Decimal("0.0000"), output_field=val_field)
+            )["total"]
+        )
+        data["metrics"]["inventory_value"] = _metric(float(inv_val.quantize(Decimal("0.01"))), phase=4)
+    if user.has_rbac_permission("purchase.view"):
+        from apps.purchasing.models import PurchaseOrder, PurchaseRequest
+
+        data["metrics"]["pending_purchase_requests"] = _metric(
+            PurchaseRequest.objects.filter(
+                status__in=[PurchaseRequest.Status.DRAFT, PurchaseRequest.Status.SUBMITTED, PurchaseRequest.Status.APPROVED]
+            ).count(),
+            phase=4,
+        )
+        data["metrics"]["pending_purchase_orders"] = _metric(
+            PurchaseOrder.objects.filter(
+                status__in=[
+                    PurchaseOrder.Status.DRAFT,
+                    PurchaseOrder.Status.APPROVED,
+                    PurchaseOrder.Status.SENT,
+                    PurchaseOrder.Status.PARTIALLY_RECEIVED,
+                ]
+            ).count(),
+            phase=4,
+        )
     for key, phase in PENDING_METRICS.items():
         data["metrics"][key] = {"value": None, "available": False, "phase": phase}
     return data

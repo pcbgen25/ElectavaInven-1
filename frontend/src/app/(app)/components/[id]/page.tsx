@@ -7,11 +7,11 @@ import { useParams, useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-import { Badge, Card, DescriptionList, ErrorState, LifecycleBadge, Modal, NotImplemented, PageHeader, Spinner } from "@/components/ui/primitives";
+import { Badge, Card, DescriptionList, ErrorState, LifecycleBadge, Modal, PageHeader, Spinner } from "@/components/ui/primitives";
 import { useToast } from "@/components/ui/toast";
 import { ApiError, api, type Paginated } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
-import { ALIAS_TYPES, STATUS_LABELS, type AuditEntry, type ComponentDetail } from "@/lib/types";
+import { ALIAS_TYPES, STATUS_LABELS, type AuditEntry, type ComponentDetail, type SupplierOfferComparison } from "@/lib/types";
 import { formatDateTime, formatRelative, triState } from "@/lib/utils";
 
 const MAX_IMAGE_MB = 5;
@@ -160,6 +160,140 @@ function ComponentStock({ id }: { id: number }) {
   );
 }
 
+function ComponentSuppliersAndPricing({ id }: { id: number }) {
+  const [qty, setQty] = useState("10");
+
+  const { data: cmp, isLoading } = useQuery<{
+    offers: SupplierOfferComparison[];
+  }>({
+    queryKey: ["supplier-parts-compare", id, qty],
+    queryFn: () => api("supplier-parts/compare", { query: { component: id, quantity: qty || 1 } }),
+    enabled: Number(qty) > 0,
+  });
+
+  const { data: history } = useQuery<{
+    purchase_orders: {
+      id: number;
+      purchase_order_id: number;
+      po_number: string;
+      po_status: string;
+      supplier_name: string;
+      supplier_part_number: string;
+      quantity_ordered: string;
+      quantity_received: string;
+      unit_price: string;
+      currency: string;
+    }[];
+  }>({
+    queryKey: ["component-purchase-history", id],
+    queryFn: () => api("purchasing/component-history", { query: { component: id } }),
+  });
+
+  const offers = cmp?.offers ?? [];
+  const orders = history?.purchase_orders ?? [];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-xs font-semibold uppercase text-slate-500">Supplier Price Comparison</span>
+        <div className="flex items-center gap-2 text-xs">
+          <label htmlFor="cmp-qty" className="text-slate-600">Eval Qty:</label>
+          <input
+            id="cmp-qty"
+            type="number"
+            min="1"
+            value={qty}
+            onChange={(e) => setQty(e.target.value)}
+            className="w-20 rounded border border-slate-300 px-2 py-1 font-mono text-xs"
+          />
+        </div>
+      </div>
+
+      {isLoading ? (
+        <Spinner />
+      ) : offers.length === 0 ? (
+        <p className="text-sm text-slate-500">No active supplier part offerings linked to this component.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="border-b border-slate-100 uppercase text-slate-500">
+              <tr>
+                <th className="py-1.5 pr-2">Supplier</th>
+                <th className="py-1.5 pr-2">Supplier PN</th>
+                <th className="py-1.5 pr-2">MOQ / Mult</th>
+                <th className="py-1.5 pr-2">Order Qty</th>
+                <th className="py-1.5 pr-2">Unit Price</th>
+                <th className="py-1.5 text-right">Extended</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {offers.map((o) => (
+                <tr key={o.supplier_part_id}>
+                  <td className="py-1.5 pr-2 font-medium">
+                    <Link href={`/suppliers/${o.supplier_id}`} className="text-blue-700 hover:underline">
+                      {o.supplier_name}
+                    </Link>
+                    {o.is_preferred && <span className="ml-1.5"><Badge tone="blue">Pref</Badge></span>}
+                  </td>
+                  <td className="py-1.5 pr-2 font-mono">{o.supplier_part_number}</td>
+                  <td className="py-1.5 pr-2 font-mono">{Number(o.moq)} / {Number(o.order_multiple)}</td>
+                  <td className="py-1.5 pr-2 font-mono">{Number(o.effective_order_quantity)}</td>
+                  <td className="py-1.5 pr-2 font-mono font-semibold">
+                    {Number(o.effective_unit_price).toFixed(4)} {o.currency}
+                  </td>
+                  <td className="py-1.5 text-right font-mono font-semibold text-emerald-700">
+                    {Number(o.extended_price).toFixed(2)} {o.currency}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {orders.length > 0 && (
+        <div className="border-t border-slate-100 pt-3">
+          <div className="mb-2 text-xs font-semibold uppercase text-slate-500">Recent Purchase Orders</div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="border-b border-slate-100 uppercase text-slate-500">
+                <tr>
+                  <th className="py-1.5 pr-2">PO #</th>
+                  <th className="py-1.5 pr-2">Supplier</th>
+                  <th className="py-1.5 pr-2">Received / Ordered</th>
+                  <th className="py-1.5 pr-2">Unit Price</th>
+                  <th className="py-1.5 text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {orders.slice(0, 5).map((po) => (
+                  <tr key={po.id}>
+                    <td className="py-1.5 pr-2 font-mono font-semibold">
+                      <Link href={`/purchasing/orders/${po.purchase_order_id}`} className="text-blue-700 hover:underline">
+                        {po.po_number}
+                      </Link>
+                    </td>
+                    <td className="py-1.5 pr-2">{po.supplier_name}</td>
+                    <td className="py-1.5 pr-2 font-mono">
+                      {Number(po.quantity_received)} / {Number(po.quantity_ordered)}
+                    </td>
+                    <td className="py-1.5 pr-2 font-mono">
+                      {Number(po.unit_price).toFixed(4)} {po.currency}
+                    </td>
+                    <td className="py-1.5 text-right">
+                      <Badge tone="slate">{po.po_status}</Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ComponentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -263,7 +397,9 @@ export default function ComponentDetailPage() {
           <Card title="Stock" actions={<Link href="/inventory/stock" className="text-xs text-blue-700 hover:underline">Manage stock</Link>}>
             <ComponentStock id={c.id} />
           </Card>
-          <Card title="Suppliers & pricing"><NotImplemented feature="Supplier parts and pricing" phase={4} /></Card>
+          <Card title="Suppliers & pricing" actions={<Link href="/suppliers" className="text-xs text-blue-700 hover:underline">Manage suppliers</Link>}>
+            <ComponentSuppliersAndPricing id={c.id} />
+          </Card>
         </div>
 
         <div className="space-y-4">
