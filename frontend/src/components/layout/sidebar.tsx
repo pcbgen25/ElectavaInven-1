@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Cpu, LogOut } from "lucide-react";
+import { ChevronDown, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";

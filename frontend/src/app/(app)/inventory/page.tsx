@@ -1,58 +1,72 @@
-'use client';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
-import { InventoryItem, StockTransaction } from '@/lib/types';
-import Link from 'next/link';
+"use client";
+
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+
+import { api } from "@/lib/api";
+import type { StockTransaction } from "@/lib/types";
+
+interface StockSummary {
+  stock_rows: number;
+  components: number;
+  warehouses: number;
+  total_on_hand: string | number;
+  total_reserved: string | number;
+  total_available: string | number;
+  out_of_stock: number;
+  low_stock: number;
+  in_stock: number;
+  active_reservations: number;
+}
 
 export default function InventoryDashboard() {
-  const { data: stock, isLoading: loadingStock } = useQuery({
-    queryKey: ['stock'],
-    queryFn: () => api<{results: InventoryItem[]}>('/inventory/stock/')
+  const { data: summary, isLoading: loadingSummary } = useQuery<StockSummary>({
+    queryKey: ["stock", "summary"],
+    queryFn: () => api<StockSummary>("/inventory/stock/summary/"),
   });
   const { data: transactions, isLoading: loadingTxns } = useQuery({
-    queryKey: ['transactions'],
-    queryFn: () => api<{results: StockTransaction[]}>('/inventory/transactions/')
+    queryKey: ["transactions"],
+    queryFn: () => api<{ results: StockTransaction[] }>("/inventory/transactions/"),
   });
-
-  const totalItems = stock?.results?.length || 0;
-  const totalQuantity = stock?.results?.reduce((acc, item) => acc + parseFloat(item.quantity_on_hand), 0) || 0;
-  const totalReserved = stock?.results?.reduce((acc, item) => acc + parseFloat(item.quantity_reserved), 0) || 0;
-  const totalAvailable = totalQuantity - totalReserved;
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Inventory Dashboard</h1>
         <div className="space-x-2">
-            <Link href="/inventory/stock" className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">View All Stock</Link>
-            <Link href="/inventory/warehouses" className="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Warehouses</Link>
+          <Link href="/inventory/stock" className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700">
+            View All Stock
+          </Link>
+          <Link href="/inventory/warehouses" className="rounded bg-gray-200 px-4 py-2 text-gray-800 hover:bg-gray-300">
+            Warehouses
+          </Link>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="p-4 bg-white rounded shadow border">
-          <p className="text-sm text-gray-500 font-medium">Total Unique Items</p>
-          <p className="text-2xl font-bold">{loadingStock ? '...' : totalItems}</p>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <div className="rounded border bg-white p-4 shadow dark:border-zinc-800 dark:bg-zinc-950">
+          <p className="text-sm font-medium text-gray-500">Unique Components in Stock</p>
+          <p className="text-2xl font-bold">{loadingSummary ? "..." : (summary?.components ?? 0)}</p>
         </div>
-        <div className="p-4 bg-white rounded shadow border">
-          <p className="text-sm text-gray-500 font-medium">Total Stock On Hand</p>
-          <p className="text-2xl font-bold text-blue-600">{loadingStock ? '...' : totalQuantity}</p>
+        <div className="rounded border bg-white p-4 shadow dark:border-zinc-800 dark:bg-zinc-950">
+          <p className="text-sm font-medium text-gray-500">Total Stock On Hand</p>
+          <p className="text-2xl font-bold text-blue-600">{loadingSummary ? "..." : (summary?.total_on_hand ?? 0)}</p>
         </div>
-        <div className="p-4 bg-white rounded shadow border">
-          <p className="text-sm text-gray-500 font-medium">Total Reserved</p>
-          <p className="text-2xl font-bold text-yellow-600">{loadingStock ? '...' : totalReserved}</p>
+        <div className="rounded border bg-white p-4 shadow dark:border-zinc-800 dark:bg-zinc-950">
+          <p className="text-sm font-medium text-gray-500">Total Reserved</p>
+          <p className="text-2xl font-bold text-yellow-600">{loadingSummary ? "..." : (summary?.total_reserved ?? 0)}</p>
         </div>
-        <div className="p-4 bg-white rounded shadow border">
-          <p className="text-sm text-gray-500 font-medium">Total Available</p>
-          <p className="text-2xl font-bold text-green-600">{loadingStock ? '...' : totalAvailable}</p>
+        <div className="rounded border bg-white p-4 shadow dark:border-zinc-800 dark:bg-zinc-950">
+          <p className="text-sm font-medium text-gray-500">Total Available</p>
+          <p className="text-2xl font-bold text-green-600">{loadingSummary ? "..." : (summary?.total_available ?? 0)}</p>
         </div>
       </div>
 
       <div className="mt-8">
-        <h2 className="text-xl font-bold mb-4">Recent Transactions</h2>
-        <div className="bg-white rounded shadow border overflow-x-auto">
+        <h2 className="mb-4 text-xl font-bold">Recent Transactions</h2>
+        <div className="overflow-x-auto rounded border bg-white shadow dark:border-zinc-800 dark:bg-zinc-950">
           <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 border-b">
+            <thead className="border-b bg-gray-50 dark:border-zinc-800 dark:bg-zinc-900">
               <tr>
                 <th className="px-4 py-3 text-left">Date</th>
                 <th className="px-4 py-3 text-left">Type</th>
@@ -62,16 +76,22 @@ export default function InventoryDashboard() {
                 <th className="px-4 py-3 text-left">User</th>
               </tr>
             </thead>
-            <tbody className="divide-y">
+            <tbody className="divide-y dark:divide-zinc-800">
               {loadingTxns ? (
-                <tr><td colSpan={6} className="px-4 py-4 text-center">Loading...</td></tr>
+                <tr>
+                  <td colSpan={6} className="px-4 py-4 text-center">
+                    Loading...
+                  </td>
+                </tr>
               ) : (
                 transactions?.results?.slice(0, 10).map((txn) => (
                   <tr key={txn.id}>
                     <td className="px-4 py-3">{new Date(txn.timestamp).toLocaleString()}</td>
                     <td className="px-4 py-3 font-medium">{txn.transaction_type}</td>
                     <td className="px-4 py-3">{txn.component_mpn}</td>
-                    <td className="px-4 py-3">{txn.warehouse_code} {txn.location_code && `/ ${txn.location_code}`}</td>
+                    <td className="px-4 py-3">
+                      {txn.warehouse_code} {txn.location_code && `/ ${txn.location_code}`}
+                    </td>
                     <td className="px-4 py-3">{txn.quantity}</td>
                     <td className="px-4 py-3">{txn.performed_by_name}</td>
                   </tr>

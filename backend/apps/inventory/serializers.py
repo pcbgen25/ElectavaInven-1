@@ -99,6 +99,8 @@ class ComponentRefSerializer(serializers.ModelSerializer):
 
 class InventoryItemSerializer(serializers.ModelSerializer):
     component = ComponentRefSerializer(read_only=True)
+    component_mpn = serializers.CharField(source="component.mpn", read_only=True)
+    component_internal_part_number = serializers.CharField(source="component.internal_part_number", read_only=True)
     warehouse_code = serializers.CharField(source="warehouse.code", read_only=True)
     warehouse_name = serializers.CharField(source="warehouse.name", read_only=True)
     location_code = serializers.CharField(source="location.code", read_only=True, default=None)
@@ -108,7 +110,8 @@ class InventoryItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = InventoryItem
         fields = [
-            "id", "component", "warehouse", "warehouse_code", "warehouse_name", "location", "location_code",
+            "id", "component", "component_mpn", "component_internal_part_number",
+            "warehouse", "warehouse_code", "warehouse_name", "location", "location_code",
             "lot_batch", "quantity_on_hand", "quantity_reserved", "quantity_available", "minimum_stock",
             "reorder_level", "maximum_stock", "unit", "stock_status", "updated_at",
         ]
@@ -131,21 +134,31 @@ class StockLevelsSerializer(serializers.Serializer):
 
 class StockTransactionSerializer(serializers.ModelSerializer):
     component = ComponentRefSerializer(read_only=True)
+    component_mpn = serializers.CharField(source="component.mpn", read_only=True)
+    component_internal_part_number = serializers.CharField(source="component.internal_part_number", read_only=True)
     warehouse_code = serializers.CharField(source="warehouse.code", read_only=True)
     location_code = serializers.CharField(source="location.code", read_only=True, default=None)
     performed_by = serializers.SerializerMethodField()
+    performed_by_name = serializers.SerializerMethodField()
 
     class Meta:
         model = StockTransaction
         fields = [
-            "id", "transaction_type", "component", "warehouse", "warehouse_code", "location", "location_code",
+            "id", "transaction_type", "component", "component_mpn", "component_internal_part_number",
+            "warehouse", "warehouse_code", "location", "location_code",
             "lot_batch", "quantity", "quantity_on_hand_after", "quantity_reserved_after", "unit_cost", "currency",
-            "source_type", "source_id", "reference", "transfer_group_id", "reason", "notes", "performed_by", "timestamp",
+            "source_type", "source_id", "reference", "transfer_group_id", "reason", "notes",
+            "performed_by", "performed_by_name", "timestamp",
         ]
         read_only_fields = fields
 
     def get_performed_by(self, obj):
         return _user_display(obj.performed_by)
+
+    def get_performed_by_name(self, obj) -> str:
+        if obj.performed_by is None:
+            return "system"
+        return obj.performed_by.full_name or obj.performed_by.email
 
 
 class StockReservationSerializer(serializers.ModelSerializer):

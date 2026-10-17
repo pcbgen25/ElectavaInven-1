@@ -85,7 +85,7 @@ function FileSlot({ component, field, canEdit }: { component: ComponentDetail; f
 }
 
 function Activity({ id }: { id: number }) {
-  const { data, isLoading, error } = useQuery<any>({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["audit", "component", String(id)],
     queryFn: () => api<Paginated<AuditEntry>>("audit-logs", { query: { entity_type: "components.component", entity_id: String(id), ordering: "-timestamp", page_size: 20 } }),
   });
@@ -94,8 +94,8 @@ function Activity({ id }: { id: number }) {
   if (!data?.results.length) return <p className="text-sm text-slate-500">No recorded activity.</p>;
   return (
     <ol className="space-y-3">
-      {data.results.map((e: any) => {
-        const changed = e.action === "UPDATE" && e.new_value ? Object.keys(e.new_value) : [];
+      {data.results.map((e) => {
+        const changed = e.action === "UPDATE" && e.new_value ? Object.keys(e.new_value as object) : [];
         return (
           <li key={e.id} className="text-sm">
             <div className="flex flex-wrap items-center gap-x-2">
@@ -111,6 +111,55 @@ function Activity({ id }: { id: number }) {
   );
 }
 
+function ComponentStock({ id }: { id: number }) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["stock", "component", String(id)],
+    queryFn: () =>
+      api<Paginated<{
+        id: number;
+        warehouse_code: string;
+        location_code: string | null;
+        lot_batch: string;
+        quantity_on_hand: string;
+        quantity_reserved: string;
+        quantity_available: string;
+        stock_status?: string;
+      }>>("inventory/stock", { query: { component: id, page_size: 50 } }),
+  });
+  if (isLoading) return <Spinner />;
+  if (error) return <ErrorState message={(error as Error).message} />;
+  if (!data?.results.length) return <p className="text-sm text-slate-500">No stock on hand across warehouses.</p>;
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="border-b border-slate-100 text-left text-xs uppercase text-slate-500">
+          <tr>
+            <th className="py-1.5 pr-3">Warehouse / Bin</th>
+            <th className="py-1.5 pr-3">Lot</th>
+            <th className="py-1.5 pr-3">On Hand</th>
+            <th className="py-1.5 pr-3">Reserved</th>
+            <th className="py-1.5">Available</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {data.results.map((row) => (
+            <tr key={row.id}>
+              <td className="py-1.5 pr-3 font-medium">
+                {row.warehouse_code}
+                {row.location_code ? ` / ${row.location_code}` : ""}
+              </td>
+              <td className="py-1.5 pr-3 text-slate-500">{row.lot_batch || "—"}</td>
+              <td className="py-1.5 pr-3">{row.quantity_on_hand}</td>
+              <td className="py-1.5 pr-3">{row.quantity_reserved}</td>
+              <td className="py-1.5 font-semibold text-emerald-700">{row.quantity_available}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export default function ComponentDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
@@ -119,7 +168,7 @@ export default function ComponentDetailPage() {
   const { can } = useAuth();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  const { data: c, isLoading, error, refetch } = useQuery<any>({
+  const { data: c, isLoading, error, refetch } = useQuery({
     queryKey: ["component", id],
     queryFn: () => api<ComponentDetail>(`components/${id}`),
   });
@@ -160,7 +209,7 @@ export default function ComponentDetailPage() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
-          <Card title={c.name} actions={<div className="flex gap-1.5"><LifecycleBadge value={c.lifecycle_status} /><Badge tone={c.status === "ACTIVE" ? "blue" : "slate"}>{STATUS_LABELS[c.status as keyof typeof STATUS_LABELS]}</Badge></div>}>
+          <Card title={c.name} actions={<div className="flex gap-1.5"><LifecycleBadge value={c.lifecycle_status} /><Badge tone={c.status === "ACTIVE" ? "blue" : "slate"}>{STATUS_LABELS[c.status]}</Badge></div>}>
             <DescriptionList items={[
               { label: "MPN", value: c.mpn && <span className="pn">{c.mpn}</span> },
               { label: "Manufacturer", value: c.manufacturer?.name },
@@ -187,7 +236,7 @@ export default function ComponentDetailPage() {
             {c.specifications.length === 0 ? <p className="text-sm text-slate-500">No specification values recorded.</p> : (
               <table className="w-full text-sm">
                 <tbody className="divide-y divide-slate-100">
-                  {c.specifications.map((s: any) => (
+                  {c.specifications.map((s) => (
                     <tr key={s.definition}>
                       <th scope="row" className="w-1/2 py-1.5 pr-4 text-left font-normal text-slate-500">{s.name}</th>
                       <td className="py-1.5 font-medium text-slate-900">{s.display_value}</td>
@@ -201,7 +250,7 @@ export default function ComponentDetailPage() {
           <Card title="Aliases">
             {c.aliases.length === 0 ? <p className="text-sm text-slate-500">No aliases.</p> : (
               <ul className="divide-y divide-slate-100 text-sm">
-                {c.aliases.map((a: any) => (
+                {c.aliases.map((a) => (
                   <li key={a.id ?? a.alias} className="flex items-center justify-between gap-2 py-1.5">
                     <span className="pn">{a.alias}</span>
                     <span className="text-xs text-slate-500">{aliasLabel(a.alias_type)}</span>
@@ -211,8 +260,9 @@ export default function ComponentDetailPage() {
             )}
           </Card>
 
-          <Card title="Where used"><NotImplemented feature="BOM where-used" phase={2} /></Card>
-          <Card title="Stock"><NotImplemented feature="Inventory / stock levels" phase={3} /></Card>
+          <Card title="Stock" actions={<Link href="/inventory/stock" className="text-xs text-blue-700 hover:underline">Manage stock</Link>}>
+            <ComponentStock id={c.id} />
+          </Card>
           <Card title="Suppliers & pricing"><NotImplemented feature="Supplier parts and pricing" phase={4} /></Card>
         </div>
 
